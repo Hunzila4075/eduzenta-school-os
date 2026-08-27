@@ -1,13 +1,16 @@
 // Centralized Full-Stack API Client Service for Eduzenta School OS
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Helper function for unified fetch requests with error handling
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
+  const token = localStorage.getItem('eduzenta_token');
+
   const defaultHeaders = {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
 
   const config = {
@@ -20,6 +23,23 @@ async function request(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
+    
+    // Explicit error handling for 401 Unauthorized / Token Expired
+    if (response.status === 401) {
+      const data = await response.json().catch(() => ({}));
+      if (data.error === 'TokenExpired' || data.message?.includes('expired')) {
+        console.warn('[API SERVICE WARNING] Session token expired. Clearing local auth.');
+        localStorage.removeItem('eduzenta_token');
+        localStorage.removeItem('eduzenta_user');
+      }
+      throw new Error(data.message || data.error || 'Session expired. Please log in again.');
+    }
+
+    // Explicit error handling for 504 Gateway / Database Timeout
+    if (response.status === 504) {
+      throw new Error('Database response timeout. Please try again.');
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -42,13 +62,39 @@ export async function checkHealth() {
   return request('/health');
 }
 
-// 2. Fetch Students (optionally filter by classSection)
+// 2. Auth: User Login (Super Admin & Staff)
+export async function loginUser(email, password) {
+  return request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password })
+  });
+}
+
+// 3. Super Admin: Onboard New School & Assign School Admin
+export async function createSchoolAdmin(payload) {
+  // payload: { school_name, admin_name, admin_email, admin_password }
+  return request('/superadmin/create-school-admin', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+// 4. User Management: Create User Account (School Admin / Super Admin)
+export async function createUser(userData) {
+  // userData: { name, email, password, role }
+  return request('/admin/create-user', {
+    method: 'POST',
+    body: JSON.stringify(userData)
+  });
+}
+
+// 5. Fetch Students (optionally filter by classSection)
 export async function fetchStudents(classSection = '') {
   const query = classSection ? `?classSection=${encodeURIComponent(classSection)}` : '';
   return request(`/students${query}`);
 }
 
-// 3. Add / Enrol New Student
+// 6. Add / Enrol New Student
 export async function addStudent(studentData) {
   return request('/students', {
     method: 'POST',
@@ -56,7 +102,7 @@ export async function addStudent(studentData) {
   });
 }
 
-// 4. Fetch Attendance Logs (optionally filter by classSection & date)
+// 7. Fetch Attendance Logs (optionally filter by classSection & date)
 export async function fetchAttendance(classSection = '', date = '') {
   const params = new URLSearchParams();
   if (classSection) params.append('classSection', classSection);
@@ -65,24 +111,22 @@ export async function fetchAttendance(classSection = '', date = '') {
   return request(`/attendance${queryString}`);
 }
 
-// 5. Save / Record Class Attendance
+// 8. Save / Record Class Attendance
 export async function saveAttendance(attendancePayload) {
-  // attendancePayload: { classSection, date, records: [{ studentId, status }], markedBy }
   return request('/attendance', {
     method: 'POST',
     body: JSON.stringify(attendancePayload)
   });
 }
 
-// 6. Fetch Broadcast Notes / Directives
+// 9. Fetch Broadcast Notes / Directives
 export async function fetchBroadcasts(targetSchoolId = 'all') {
   const query = targetSchoolId ? `?targetSchoolId=${encodeURIComponent(targetSchoolId)}` : '';
   return request(`/broadcasts${query}`);
 }
 
-// 7. Create / Publish Broadcast Directive
+// 10. Create / Publish Broadcast Directive
 export async function createBroadcast(broadcastPayload) {
-  // broadcastPayload: { title, description, imageUrl, videoUrl, targetSchoolId, sender }
   return request('/broadcasts', {
     method: 'POST',
     body: JSON.stringify(broadcastPayload)
