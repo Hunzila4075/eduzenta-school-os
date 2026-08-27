@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary: #5A3193;
+    --primary-hover: #4C2A7B;
+    --primary-light: #7042b3;
+    --primary-bg: #f5f0fb;
+    --heading-dark: #2d1a4e;
+    --bg-main: #f8fafc;
+    --qobe-purple: #5A3193;
+    --qobe-green: #16a34a;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: #1e293b;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--heading-dark);
+  }
+}
+
+/* QOBE Custom Styling & Utilities */
+.qobe-btn-primary {
+  background-color: #5A3193;
+  color: #ffffff;
+  transition: all 0.2s ease-in-out;
+}
+.qobe-btn-primary:hover {
+  background-color: #4C2A7B;
+  box-shadow: 0 4px 12px rgba(90, 49, 147, 0.25);
+}
+
+.qobe-btn-green {
+  background-color: #16a34a;
+  color: #ffffff;
+  transition: all 0.2s ease-in-out;
+}
+.qobe-btn-green:hover {
+  background-color: #15803d;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+}
+
+.qobe-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.qobe-focus-ring {
+  border-color: #5A3193;
+  box-shadow: 0 0 0 3px rgba(90, 49, 147, 0.15);
+}
+
+/* QOBE Login Card Blur Backdrop */
+.qobe-login-backdrop {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(90, 49, 147, 0.85) 100%),
+              url('https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1920&q=80') center/cover no-repeat;
+  backdrop-filter: blur(8px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 2-Part Fee Chalan & PDF Print Styles */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .page-break {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+}
+
+.page-break-card {
+  page-break-after: always;
+  break-after: page;
+}
