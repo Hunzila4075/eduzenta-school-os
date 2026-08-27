@@ -45,9 +45,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Initialize DB Tables & Seed Super Admin on Startup
-initializeDatabase();
-
 // Health Check API Route
 app.get('/api/health', async (req, res) => {
   const dbStatus = await testConnection();
@@ -92,10 +89,22 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
-// Start Express Server
-app.listen(PORT, () => {
-  console.log(`=================================================`);
-  console.log(`⚡ Eduzenta Backend API Server running on port ${PORT}`);
-  console.log(`🔗 Health Check Endpoint: http://localhost:${PORT}/api/health`);
-  console.log(`=================================================`);
-});
+// Server Initialization & Startup Sequence
+async function startServer() {
+  try {
+    // Force DB auto-migration and Super Admin seeding BEFORE listening
+    await initializeDatabase();
+
+    app.listen(PORT, () => {
+      console.log(`=================================================`);
+      console.log(`⚡ Eduzenta Backend API Server running on port ${PORT}`);
+      console.log(`🔗 Health Check Endpoint: http://localhost:${PORT}/api/health`);
+      console.log(`=================================================`);
+    });
+  } catch (error) {
+    console.error('❌ Server startup error:', error);
+    process.exit(1);
+  }
+}
+
+startServer();

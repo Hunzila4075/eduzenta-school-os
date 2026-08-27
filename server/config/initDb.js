@@ -26,7 +26,7 @@ export async function initializeDatabase() {
           \`email\` VARCHAR(255) NOT NULL UNIQUE,
           \`password\` VARCHAR(255) NOT NULL,
           \`role\` ENUM('super_admin', 'admin', 'teacher', 'student', 'parent') NOT NULL DEFAULT 'admin',
-          \`is_active\` BOOLEAN DEFAULT TRUE,
+          \`is_active\` TINYINT(1) DEFAULT 1,
           \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           INDEX \`idx_school_id\` (\`school_id\`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -112,9 +112,10 @@ export async function initializeDatabase() {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
 
-      // 7. AUTO-SEED STRICT INITIAL SUPER ADMIN ACCOUNT
+      // 7. FORCE AUTO-SEED / UPSERT SUPER ADMIN ACCOUNT
       const superAdminEmail = 'developerwithkhan804@gmail.com';
       const superAdminPasswordRaw = 'hunny12345';
+      const hashedPassword = await bcrypt.hash(superAdminPasswordRaw, 10);
 
       const [existingUser] = await connection.query(
         'SELECT id FROM users WHERE email = ?',
@@ -122,20 +123,23 @@ export async function initializeDatabase() {
       );
 
       if (!existingUser || existingUser.length === 0) {
-        const hashedPassword = await bcrypt.hash(superAdminPasswordRaw, 10);
         await connection.query(
-          `INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (NULL, ?, ?, ?, 'super_admin', TRUE)`,
-          ['Super Admin Developer', superAdminEmail, hashedPassword]
+          `INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (NULL, ?, ?, ?, 'super_admin', 1)`,
+          ['Eduzenta Super Admin', superAdminEmail, hashedPassword]
         );
-        console.log(`✅ Super Admin Account Seeded Successfully: ${superAdminEmail}`);
+        console.log(`✅ Super Admin Account Created & Seeded: ${superAdminEmail}`);
       } else {
-        console.log(`ℹ️ Super Admin Account already exists: ${superAdminEmail}`);
+        await connection.query(
+          `UPDATE users SET password = ?, role = 'super_admin', is_active = 1, name = 'Eduzenta Super Admin' WHERE email = ?`,
+          [hashedPassword, superAdminEmail]
+        );
+        console.log(`✅ Super Admin Account Credentials Verified & Updated: ${superAdminEmail}`);
       }
 
     } finally {
       connection.release();
     }
-    console.log('✅ Database Initialization & Schema Auto-Migration Complete.');
+    console.log('✅ Database Schema Auto-Migration & Super Admin Seeding Completed Successfully.');
   } catch (error) {
     console.error('❌ Database Initialization Failed:', error.message);
   }
