@@ -112,34 +112,30 @@ export async function initializeDatabase() {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
 
-      // 7. FORCE AUTO-SEED / UPSERT SUPER ADMIN ACCOUNT
+      // 7. INITIAL SUPER ADMIN SEEDING (INSERT IGNORE TO PRESERVE PROFILE UPDATES ON RESTART)
       const superAdminEmail = 'developerwithkhan804@gmail.com';
       const superAdminPasswordRaw = 'hunny12345';
-      const hashedPassword = await bcrypt.hash(superAdminPasswordRaw, 10);
 
       const [existingUser] = await connection.query(
-        'SELECT id FROM users WHERE email = ?',
+        'SELECT id FROM users WHERE email = ? OR role = "super_admin"',
         [superAdminEmail]
       );
 
       if (!existingUser || existingUser.length === 0) {
+        const hashedPassword = await bcrypt.hash(superAdminPasswordRaw, 10);
         await connection.query(
-          `INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (NULL, ?, ?, ?, 'super_admin', 1)`,
+          `INSERT IGNORE INTO users (school_id, name, email, password, role, is_active) VALUES (NULL, ?, ?, ?, 'super_admin', 1)`,
           ['Eduzenta Super Admin', superAdminEmail, hashedPassword]
         );
-        console.log(`✅ Super Admin Account Created & Seeded: ${superAdminEmail}`);
+        console.log(`✅ Super Admin Account Seeded: ${superAdminEmail}`);
       } else {
-        await connection.query(
-          `UPDATE users SET password = ?, role = 'super_admin', is_active = 1, name = 'Eduzenta Super Admin' WHERE email = ?`,
-          [hashedPassword, superAdminEmail]
-        );
-        console.log(`✅ Super Admin Account Credentials Verified & Updated: ${superAdminEmail}`);
+        console.log(`ℹ️ Existing Super Admin account preserved (skipping overwrite).`);
       }
 
     } finally {
       connection.release();
     }
-    console.log('✅ Database Schema Auto-Migration & Super Admin Seeding Completed Successfully.');
+    console.log('✅ Database Schema Auto-Migration & Persistence Check Completed Successfully.');
   } catch (error) {
     console.error('❌ Database Initialization Failed:', error.message);
   }
