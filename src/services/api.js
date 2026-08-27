@@ -1,6 +1,6 @@
 // Centralized Full-Stack API Client Service for Eduzenta School OS
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://eduzenta-school-os-production.up.railway.app/api';
 
 // Helper function for unified fetch requests with error handling
 async function request(endpoint, options = {}) {
