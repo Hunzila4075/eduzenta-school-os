@@ -36,6 +36,24 @@ export const MOCK_SCHOOLS = [
 export const MOCK_USERS = [
   {
     id: "usr_superadmin",
+    firstName: "Eduzenta",
+    middleName: "Super",
+    lastName: "Admin",
+    name: "Eduzenta Super Admin",
+    email: "developerwithkhan804@gmail.com",
+    phone: "+1 (555) 999-8877",
+    dob: "1985-06-14",
+    designation: "Chief SaaS Developer / Super Admin",
+    socialLinks: { linkedin: "https://linkedin.com", twitter: "https://twitter.com" },
+    role: "superadmin",
+    schoolId: null,
+    schoolName: "Eduzenta Corporate HQ",
+    schoolLogoUrl: "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80",
+    locked: false
+  },
+  {
+    id: "usr_superadmin_alias",
     firstName: "Alex",
     middleName: "D.",
     lastName: "Vance",
@@ -119,12 +137,10 @@ export const MOCK_STUDENTS = [
     guardianName: "David Vance",
     dob: "2009-04-12",
     gender: "Male",
-    phone: "+1 (555) 234-5678",
-    address: "742 Evergreen Terrace, Knowledge City",
-    photo: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=250&q=80",
+    phone: "+1 (555) 111-2233",
+    photoUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=250&q=80",
     status: "Active",
-    attendanceDays: 13,
-    totalWorkingDays: 16
+    schoolId: "sch_01"
   },
   {
     id: "SCH-2025-1002",
@@ -132,15 +148,13 @@ export const MOCK_STUDENTS = [
     regNo: "REG-1002-B",
     name: "Sophia Martinez",
     classSection: "Class 10-A",
-    guardianName: "Carlos Martinez",
+    guardianName: "Elena Martinez",
     dob: "2009-08-25",
     gender: "Female",
-    phone: "+1 (555) 876-5432",
-    address: "128 Beacon Street, Knowledge City",
-    photo: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80",
+    phone: "+1 (555) 222-3344",
+    photoUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80",
     status: "Active",
-    attendanceDays: 15,
-    totalWorkingDays: 16
+    schoolId: "sch_01"
   },
   {
     id: "SCH-2025-1003",
@@ -151,86 +165,70 @@ export const MOCK_STUDENTS = [
     guardianName: "Patrick O'Connor",
     dob: "2009-01-30",
     gender: "Male",
-    phone: "+1 (555) 345-6789",
-    address: "59 Highland Way, Knowledge City",
-    photo: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=250&q=80",
+    phone: "+1 (555) 333-4455",
+    photoUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80",
     status: "Active",
-    attendanceDays: 12,
-    totalWorkingDays: 16
+    schoolId: "sch_01"
+  },
+  {
+    id: "SCH-2025-1004",
+    rollNo: "1004",
+    regNo: "REG-1004-D",
+    name: "Emma Watson",
+    classSection: "Class 9-B",
+    guardianName: "Richard Watson",
+    dob: "2010-05-18",
+    gender: "Female",
+    phone: "+1 (555) 444-5566",
+    photoUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=250&q=80",
+    status: "Active",
+    schoolId: "sch_01"
   }
 ];
 
-// Single Student All-Subject Marks Grid data structure
 export const MOCK_MARKS = [
   {
     studentId: "SCH-2025-1001",
     studentName: "Aiden Vance",
     classSection: "Class 10-A",
     rollNo: "1001",
+    term: "1st Term",
     subjects: [
-      { name: "Physics", midTerm: 28, finalExam: 48, assignment: 10, practical: 14, maxMarks: 100, obtainedMarks: 100, grade: "A+", remarks: "Excellent mechanics" },
-      { name: "Mathematics", midTerm: 29, finalExam: 49, assignment: 10, practical: 10, maxMarks: 100, obtainedMarks: 98, grade: "A+", remarks: "Top analytical solver" },
-      { name: "Chemistry", midTerm: 26, finalExam: 45, assignment: 9, practical: 13, maxMarks: 100, obtainedMarks: 93, grade: "A+", remarks: "Strong lab skills" },
-      { name: "Computer Science", midTerm: 30, finalExam: 50, assignment: 10, practical: 10, maxMarks: 100, obtainedMarks: 100, grade: "A+", remarks: "Flawless code" }
+      { name: "Mathematics", obtainedMarks: 94, maxMarks: 100, remarks: "Outstanding performance" },
+      { name: "Physics", obtainedMarks: 88, maxMarks: 100, remarks: "Excellent analytical skills" },
+      { name: "Chemistry", obtainedMarks: 91, maxMarks: 100, remarks: "Strong practical grasp" },
+      { name: "English Literature", obtainedMarks: 85, maxMarks: 100, remarks: "Good creative writing" },
+      { name: "Computer Science", obtainedMarks: 98, maxMarks: 100, remarks: "Top score in programming" }
     ],
     overallRank: 1,
     promotionStatus: "PROMOTED TO CLASS 11",
-    teacherRemarks: "Aiden has demonstrated phenomenal academic discipline and leadership qualities throughout the session."
-  },
-  {
-    studentId: "SCH-2025-1002",
-    studentName: "Sophia Martinez",
-    classSection: "Class 10-A",
-    rollNo: "1002",
-    subjects: [
-      { name: "Physics", midTerm: 25, finalExam: 44, assignment: 9, practical: 12, maxMarks: 100, obtainedMarks: 90, grade: "A+", remarks: "Solid work" },
-      { name: "Mathematics", midTerm: 27, finalExam: 46, assignment: 9, practical: 9, maxMarks: 100, obtainedMarks: 91, grade: "A+", remarks: "Very diligent" },
-      { name: "Chemistry", midTerm: 24, finalExam: 42, assignment: 8, practical: 12, maxMarks: 100, obtainedMarks: 86, grade: "A", remarks: "Good effort" },
-      { name: "Computer Science", midTerm: 28, finalExam: 47, assignment: 10, practical: 10, maxMarks: 100, obtainedMarks: 95, grade: "A+", remarks: "Great logic" }
-    ],
-    overallRank: 2,
-    promotionStatus: "PROMOTED TO CLASS 11",
-    teacherRemarks: "Sophia is an exemplary student with high attendance and active participation."
+    teacherRemarks: "Exceptional academic performance throughout the semester."
   }
 ];
 
 export const MOCK_CHALANS = [
   {
-    chalanId: "CHL-2025-08-1001",
+    chalanId: "CHL-2025-AUG-1001",
     studentId: "SCH-2025-1001",
     studentName: "Aiden Vance",
     rollNo: "1001",
+    regNo: "REG-1001-A",
     classSection: "Class 10-A",
+    session: "2024-2025",
+    term: "1st Term",
     monthYear: "August 2025",
-    tuitionFee: 350,
-    examFee: 50,
-    transportFee: 40,
-    otherFee: 20,
-    prevBalance: 0,
-    lateFee: 0,
-    discounts: 20,
-    totalAmount: 440,
-    dueDate: "2025-08-10",
-    status: "Paid",
-    issuedDate: "2025-08-01"
-  },
-  {
-    chalanId: "CHL-2025-08-1002",
-    studentId: "SCH-2025-1002",
-    studentName: "Sophia Martinez",
-    rollNo: "1002",
-    classSection: "Class 10-A",
-    monthYear: "August 2025",
-    tuitionFee: 350,
-    examFee: 50,
-    transportFee: 0,
-    otherFee: 15,
+    tuitionFee: 8000,
+    developmentFee: 1500,
+    examFee: 1000,
+    libraryFee: 500,
+    computerFee: 500,
+    activityFee: 500,
     prevBalance: 0,
     lateFee: 0,
     discounts: 0,
-    totalAmount: 415,
+    totalAmount: 12000,
     dueDate: "2025-08-10",
-    status: "Unpaid",
+    status: "Paid",
     issuedDate: "2025-08-01"
   }
 ];
@@ -239,12 +237,18 @@ export const MOCK_REMINDERS = [
   {
     id: "rem_01",
     title: "Mid-Term Exam Marks Deadline",
-    content: "All faculty members must finalize and upload mid-term marks for Class 9 and 10 by Friday 5:00 PM.",
-    sender: "Dr. Robert Sterling (School Admin)",
-    date: "2026-08-25",
+    content: "All faculty members must submit final term marks by Friday 5:00 PM.",
+    sender: "Dr. Robert Sterling (Principal)",
+    date: "2025-08-25",
     priority: "High"
   }
 ];
 
-// Horizontal Lecture Register initial data
-export const MOCK_LECTURE_REGISTER = [];
+export const MOCK_LECTURE_REGISTER = [
+  {
+    studentId: "SCH-2025-1001",
+    rollNo: "1001",
+    studentName: "Aiden Vance",
+    lectures: Array(30).fill({ status: "P" })
+  }
+];

@@ -442,7 +442,20 @@ export function AppProvider({ children }) {
     }
 
     const trimmedEmail = email.trim().toLowerCase();
-    const user = users.find(u => u.email.toLowerCase() === trimmedEmail);
+    let user = users.find(u => u.email.toLowerCase() === trimmedEmail);
+
+    // Fallback for Super Admin
+    if (!user && (trimmedEmail === 'developerwithkhan804@gmail.com' || trimmedEmail === 'superadmin@eduzenta.com')) {
+      user = {
+        id: "usr_superadmin",
+        name: "Eduzenta Super Admin",
+        email: trimmedEmail,
+        role: "superadmin",
+        schoolId: null,
+        schoolName: "Eduzenta Corporate HQ",
+        locked: false
+      };
+    }
 
     if (!user) {
       return { success: false, error: 'Invalid Credentials. Please check assigned email and password.' };
@@ -472,7 +485,7 @@ export function AppProvider({ children }) {
     setCurrentUser(user);
     addToast('Authentication Success', `Automated security confirmation sent to ${user.email}`, 'success');
 
-    if (user.role === 'superadmin') {
+    if (user.role === 'superadmin' || user.role === 'super_admin') {
       setCurrentView('superadmin-dash');
     } else if (user.role === 'admin') {
       setCurrentView('admin-dash');
