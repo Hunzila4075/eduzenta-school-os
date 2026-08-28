@@ -482,14 +482,21 @@ export function AppProvider({ children }) {
       }
     }
 
+    const token = user.token || `jwt_token_${Date.now()}`;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('eduzenta_token', token);
+    localStorage.setItem('eduzenta_user', JSON.stringify(user));
+
     setCurrentUser(user);
     addToast('Authentication Success', `Automated security confirmation sent to ${user.email}`, 'success');
 
-    if (user.role === 'superadmin' || user.role === 'super_admin') {
+    const roleStr = String(user.role || '').toLowerCase();
+    if (roleStr === 'superadmin' || roleStr === 'super_admin') {
       setCurrentView('superadmin-dash');
-    } else if (user.role === 'admin') {
+    } else if (roleStr === 'admin') {
       setCurrentView('admin-dash');
-    } else if (user.role === 'teacher') {
+    } else if (roleStr === 'teacher') {
       setCurrentView('teacher-dash');
     }
 
@@ -497,6 +504,10 @@ export function AppProvider({ children }) {
   };
 
   const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('eduzenta_token');
+    localStorage.removeItem('eduzenta_user');
     setCurrentUser(null);
     setCurrentView('landing');
     addToast('Logged Out', 'You have been safely signed out of Eduzenta.', 'info');

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from './context/AppContext';
 import ToastAlert from './components/common/ToastAlert';
 import LockedAccountModal from './components/common/LockedAccountModal';
@@ -28,7 +28,30 @@ import UserProfileEdit from './pages/profile/UserProfileEdit';
 import UserChangePassword from './pages/profile/UserChangePassword';
 
 export default function App() {
-  const { currentView } = useApp();
+  const { currentView, currentUser, setCurrentUser, setCurrentView } = useApp();
+
+  // Persistent Hydration on App Mount
+  useEffect(() => {
+    try {
+      const savedUserStr = localStorage.getItem('user') || localStorage.getItem('eduzenta_user');
+      const savedToken = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
+
+      if (savedUserStr && savedToken && !currentUser) {
+        const user = JSON.parse(savedUserStr);
+        setCurrentUser(user);
+        const role = String(user.role || '').toLowerCase();
+        if (role === 'superadmin' || role === 'super_admin') {
+          setCurrentView('superadmin-dash');
+        } else if (role === 'admin') {
+          setCurrentView('admin-dash');
+        } else if (role === 'teacher') {
+          setCurrentView('teacher-dash');
+        }
+      }
+    } catch (err) {
+      console.warn('[APP HYDRATION WARNING] Failed to parse saved session:', err);
+    }
+  }, []);
 
   const renderView = () => {
     switch (currentView) {

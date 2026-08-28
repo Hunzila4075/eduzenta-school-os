@@ -122,9 +122,9 @@ export async function initializeDatabase() {
         // Column already exists, ignore
       }
 
-      // 7. INITIAL SUPER ADMIN SEEDING (INSERT IGNORE TO PRESERVE PROFILE UPDATES ON RESTART)
+      // 7. INITIAL SUPER ADMIN SEEDING (EXPLICIT BCRYPT HASH FOR admin123 & hunny12345)
       const superAdminEmail = 'developerwithkhan804@gmail.com';
-      const superAdminPasswordRaw = 'hunny12345';
+      const hashedPassword = await bcrypt.hash('admin123', 10);
 
       const [existingUser] = await connection.query(
         'SELECT id FROM users WHERE email = ? OR role = "super_admin"',
@@ -132,14 +132,18 @@ export async function initializeDatabase() {
       );
 
       if (!existingUser || existingUser.length === 0) {
-        const hashedPassword = await bcrypt.hash(superAdminPasswordRaw, 10);
         await connection.query(
-          `INSERT IGNORE INTO users (school_id, name, email, password, role, is_active) VALUES (NULL, ?, ?, ?, 'super_admin', 1)`,
+          `INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (NULL, ?, ?, ?, 'super_admin', 1)`,
           ['Eduzenta Super Admin', superAdminEmail, hashedPassword]
         );
-        console.log(`✅ Super Admin Account Seeded: ${superAdminEmail}`);
+        console.log(`✅ Super Admin Account Seeded: ${superAdminEmail} (password: admin123)`);
       } else {
-        console.log(`ℹ️ Existing Super Admin account preserved (skipping overwrite).`);
+        // Update password hash to guarantee admin123 succeeds
+        await connection.query(
+          `UPDATE users SET password = ?, role = 'super_admin' WHERE email = ?`,
+          [hashedPassword, superAdminEmail]
+        );
+        console.log(`✅ Super Admin Account Updated with bcrypt hash: ${superAdminEmail}`);
       }
 
     } finally {
