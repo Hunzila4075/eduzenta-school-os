@@ -13,8 +13,10 @@ export default function StudentDatabase() {
     addStudent,
     updateStudent,
     deactivateStudent,
-    deleteStudent
+    deleteStudent,
+    addToast
   } = useApp();
+
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
 
@@ -79,7 +81,7 @@ export default function StudentDatabase() {
     const studentData = { name, classSection, guardianName, dob, gender, phone, address };
 
     try {
-      // Try to save via API
+      // Save via API to MySQL database
       const response = await apiAddStudent({
         rollNo: String(Date.now()).slice(-4),
         name,
@@ -89,20 +91,23 @@ export default function StudentDatabase() {
         guardianName
       });
       if (response?.success && response.data) {
-        // Merge new student into local display list
-        setApiStudents(prev => prev !== null ? [response.data, ...prev] : null);
+        // Reload all students from DB after successful insert
+        await loadStudentsFromApi();
+        addToast('Student Enrolled', `${name} has been added to the database.`, 'success');
+      } else {
+        throw new Error(response?.error || 'Failed to enroll student.');
       }
     } catch (err) {
-      // Silently fall back to context
+      console.error('[STUDENT ADD ERROR]:', err);
+      addToast('Enrollment Failed', err.message || 'Failed to add student to database.', 'warning');
     } finally {
       setIsSaving(false);
     }
 
-    // Also save to AppContext (local state) as source of truth for rest of app
-    addStudent(studentData);
     setIsAddModalOpen(false);
     resetForm();
   };
+
 
   const handleEditOpen = (std) => {
     setEditingStudentId(std.id);

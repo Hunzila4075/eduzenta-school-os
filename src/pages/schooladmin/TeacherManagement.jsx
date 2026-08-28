@@ -34,18 +34,21 @@ export default function TeacherManagement() {
     setEditingTeacherId(null);
   };
 
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
-    addTeacher({
+    const result = await addTeacher({
       name,
       email,
       password: password || 'teacher123',
       assignedClasses: assignedClasses.split(',').map(s => s.trim()),
       assignedSubjects: assignedSubjects.split(',').map(s => s.trim())
     });
-    setIsAddModalOpen(false);
-    resetForm();
+    if (result?.success !== false) {
+      setIsAddModalOpen(false);
+      resetForm();
+    }
   };
+
 
   const handleEditOpen = (teacher) => {
     setEditingTeacherId(teacher.id);

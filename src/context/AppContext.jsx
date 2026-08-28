@@ -1,8 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
 import {
-  MOCK_USERS,
-  MOCK_SCHOOLS,
-  MOCK_STUDENTS,
   MOCK_MARKS,
   MOCK_CHALANS,
   MOCK_REMINDERS,
@@ -14,12 +11,56 @@ import {
   fetchUsers as fetchUsersApi,
   fetchSchools as fetchSchoolsApi,
   fetchStudents as fetchStudentsApi,
+  createUser as createUserApi,
+  addStudent as addStudentApi,
   updateUser as updateUserApi,
   deleteUser as deleteUserApi,
   deleteStudent as deleteStudentApi,
   updateProfile as updateProfileApi,
   updatePassword as updatePasswordApi
 } from '../services/api';
+
+// Safe localStorage helper — strips large base64 avatar before storing
+function safeStoreUser(user) {
+  if (!user) return;
+  const lightweight = { ...user };
+  // Remove base64 blobs — avatar_url in DB is fetched fresh on login
+  if (lightweight.avatar && String(lightweight.avatar).startsWith('data:')) {
+    delete lightweight.avatar;
+  }
+  if (lightweight.avatar_url && String(lightweight.avatar_url).startsWith('data:')) {
+    delete lightweight.avatar_url;
+  }
+  try {
+    localStorage.setItem('user', JSON.stringify(lightweight));
+    localStorage.setItem('eduzenta_user', JSON.stringify(lightweight));
+  } catch (e) {
+    // If still too large, store only essential fields
+    const minimal = { id: user.id, name: user.name, email: user.email, role: user.role, school_id: user.school_id };
+    try {
+      localStorage.setItem('user', JSON.stringify(minimal));
+      localStorage.setItem('eduzenta_user', JSON.stringify(minimal));
+    } catch (_) { /* ignore */ }
+  }
+}
+
+// Sanitize existing localStorage on startup — remove any stale base64 bloat
+function sanitizeLocalStorage() {
+  try {
+    ['user', 'eduzenta_user'].forEach(key => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.avatar && String(parsed.avatar).startsWith('data:')) {
+        delete parsed.avatar;
+      }
+      if (parsed?.avatar_url && String(parsed.avatar_url).startsWith('data:')) {
+        delete parsed.avatar_url;
+      }
+      localStorage.setItem(key, JSON.stringify(parsed));
+    });
+  } catch (_) { /* ignore */ }
+}
 
 const AppContext = createContext();
 
@@ -28,13 +69,16 @@ export function AppProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [lockedModal, setLockedModal] = useState({ open: false, email: '', message: '' });
 
-  // Core Data States
-  const [users, setUsers] = useState(MOCK_USERS);
-  const [schools, setSchools] = useState(MOCK_SCHOOLS);
-  const [students, setStudents] = useState(MOCK_STUDENTS);
+  // Core Data States — start EMPTY; populated from MySQL on mount
+  const [users, setUsers] = useState([]);
+  const [schools, setSchools] = useState([]);
+  const [students, setStudents] = useState([]);
   const [marks, setMarks] = useState(MOCK_MARKS);
   const [chalans, setChalans] = useState(MOCK_CHALANS);
   const [attendance, setAttendance] = useState([]);
+
+  // Sanitize localStorage on first render to remove old base64 blobs
+  React.useEffect(() => { sanitizeLocalStorage(); }, []);
   const [attendanceOverrides, setAttendanceOverrides] = useState([]);
   const [activities, setActivities] = useState([]);
 
@@ -52,10 +96,14 @@ export function AppProvider({ children }) {
               avatar: meRes.user.avatar_url || meRes.user.avatar || null
             };
             setCurrentUser(prev => ({ ...(prev || {}), ...userWithAvatar }));
-            localStorage.setItem('user', JSON.stringify(userWithAvatar));
-            localStorage.setItem('eduzenta_user', JSON.stringify(userWithAvatar));
+            safeStoreUser(userWithAvatar);
           }
         } catch (err) {
+          // Token invalid — clear it
+          if (err.message && err.message.includes('expired')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('eduzenta_token');
+          }
           console.warn('[DB HYDRATION] fetchMe failed:', err.message);
         }
 
@@ -530,9 +578,8 @@ export function AppProvider({ children }) {
     }
 
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('eduzenta_token', token);
-    localStorage.setItem('eduzenta_user', JSON.stringify(user));
+    safeStoreUser(user);
 
     setCurrentUser(user);
     addToast('Authentication Success', `Welcome back, ${user.name || user.email}`, 'success');
@@ -607,51 +654,35 @@ export function AppProvider({ children }) {
     }));
   };
 
-  // Onboard School Admin with Local File Upload Logo
+  // Onboard School Admin — uses real DB IDs returned from API (called after createSchoolAdminApi succeeds)
   const addSchoolAdmin = (data) => {
-    const newSchoolId = `sch_${Date.now()}`;
-    const newUserId = `usr_admin_${Date.now()}`;
-    const defaultLogo = "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";
-
-    const logoUrl = data.schoolLogoUrl || defaultLogo;
+    // data.id and data.schoolId come from API response (real numeric DB IDs)
+    const logoUrl = data.schoolLogoUrl || null;
 
     const newSchool = {
-      id: newSchoolId,
+      id: data.schoolId,  // Real DB school id
       name: data.schoolName,
       logoUrl: logoUrl,
       adminEmail: data.email,
-      adminName: `${data.firstName} ${data.lastName}`,
-      city: data.city || 'Knowledge City',
-      address: data.address || '123 Education Boulevard',
-      studentsCount: 0,
-      teachersCount: 0,
+      adminName: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
       status: 'Active',
-      monthlyRevenue: 1500,
-      createdAt: new Date().toISOString().split('T')[0],
-      ipLogs: ['192.168.1.100 (New Session)']
+      createdAt: new Date().toISOString().split('T')[0]
     };
 
     const newUser = {
-      id: newUserId,
-      firstName: data.firstName,
-      middleName: data.middleName || '',
-      lastName: data.lastName,
-      name: `${data.firstName} ${data.lastName}`,
-      email: data.email, // IMMUTABLE
-      phone: data.phone || '+1 (555) 000-0000',
-      dob: data.dob || '1985-01-01',
-      designation: 'School Administrator',
+      id: data.id,  // Real DB user id (numeric)
+      name: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+      email: data.email,
       role: 'admin',
-      schoolId: newSchoolId,
+      schoolId: data.schoolId,
       schoolName: data.schoolName,
       schoolLogoUrl: logoUrl,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80',
+      isActive: true,
       locked: false
     };
 
     setSchools(prev => [...prev, newSchool]);
     setUsers(prev => [...prev, newUser]);
-    addToast('School Admin Onboarded', `Logo & Branding bound to ${data.schoolName}.`, 'success');
   };
 
   const updateSchoolAdmin = async (userId, updatedFields) => {
@@ -702,31 +733,39 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Teacher CRUD
-  const addTeacher = (teacherData) => {
-    const sch = schools.find(s => s.id === currentUser?.schoolId) || schools[0];
-    const newTeacher = {
-      id: `usr_teacher_${Date.now()}`,
-      firstName: teacherData.firstName || teacherData.name.split(' ')[0],
-      middleName: teacherData.middleName || '',
-      lastName: teacherData.lastName || teacherData.name.split(' ')[1] || '',
-      name: teacherData.name,
-      email: teacherData.email,
-      phone: teacherData.phone || '+1 (555) 000-0000',
-      dob: teacherData.dob || '1990-01-01',
-      designation: teacherData.designation || 'Lecturer',
-      role: 'teacher',
-      schoolId: sch.id,
-      schoolName: sch.name,
-      schoolLogoUrl: sch.logoUrl,
-      assignedClasses: teacherData.assignedClasses || ['Class 10-A'],
-      assignedSubjects: teacherData.assignedSubjects || ['Physics'],
-      avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=250&q=80',
-      locked: false
-    };
-
-    setUsers(prev => [...prev, newTeacher]);
-    addToast('Faculty Added', `Credentials assigned to ${teacherData.email}`, 'success');
+  // Teacher CRUD — Teachers are stored in MySQL users table with role=teacher
+  const addTeacher = async (teacherData) => {
+    const schoolId = currentUser?.school_id || currentUser?.schoolId || null;
+    try {
+      const res = await createUserApi({
+        name: teacherData.name,
+        email: teacherData.email,
+        password: teacherData.password || 'teacher123',
+        role: 'teacher',
+        school_id: schoolId
+      });
+      if (res?.user) {
+        const newTeacher = {
+          id: res.user.id,  // Real DB numeric id
+          name: res.user.name,
+          email: res.user.email,
+          role: 'teacher',
+          schoolId: res.user.school_id,
+          assignedClasses: teacherData.assignedClasses || ['Class 10-A'],
+          assignedSubjects: teacherData.assignedSubjects || ['Physics'],
+          isActive: true,
+          locked: false
+        };
+        setUsers(prev => [...prev, newTeacher]);
+        addToast('Faculty Added', `Teacher account created for ${teacherData.email}`, 'success');
+        return { success: true, user: newTeacher };
+      }
+      throw new Error(res?.message || 'Failed to create teacher.');
+    } catch (err) {
+      console.error('[ADD TEACHER ERROR]:', err);
+      addToast('Teacher Creation Failed', err.message || 'Failed to add teacher to database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   const updateTeacher = (teacherId, updatedData) => {
@@ -753,27 +792,28 @@ export function AppProvider({ children }) {
   };
 
   // Student CRUD
-  const addStudent = (studentData) => {
-    const newId = `SCH-2025-${1000 + students.length + 1}`;
-    const newStudent = {
-      id: newId,
-      rollNo: `${1000 + students.length + 1}`,
-      regNo: `REG-${1000 + students.length + 1}-X`,
-      name: studentData.name,
-      classSection: studentData.classSection,
-      guardianName: studentData.guardianName,
-      dob: studentData.dob || '2009-05-15',
-      gender: studentData.gender || 'Male',
-      phone: studentData.phone || '+1 (555) 000-0000',
-      address: studentData.address || 'Knowledge City',
-      photo: studentData.photo || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=250&q=80',
-      status: 'Active',
-      attendanceDays: 13,
-      totalWorkingDays: 16
-    };
-
-    setStudents(prev => [...prev, newStudent]);
-    addToast('Student Enrolled', `${studentData.name} added (ID: ${newId})`, 'success');
+  // Student CRUD — Students are stored in MySQL students table
+  const addStudent = async (studentData) => {
+    try {
+      const res = await addStudentApi({
+        rollNo: studentData.rollNo || String(Date.now()).slice(-4),
+        name: studentData.name,
+        classSection: studentData.classSection,
+        gender: studentData.gender || 'Male',
+        phone: studentData.phone || null,
+        guardianName: studentData.guardianName || null
+      });
+      if (res?.data) {
+        setStudents(prev => [res.data, ...prev]);
+        addToast('Student Enrolled', `${studentData.name} added to database.`, 'success');
+        return { success: true, student: res.data };
+      }
+      throw new Error(res?.error || 'Failed to enroll student.');
+    } catch (err) {
+      console.error('[ADD STUDENT ERROR]:', err);
+      addToast('Enrollment Failed', err.message || 'Failed to add student to database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   const updateStudent = (id, data) => {
@@ -942,8 +982,7 @@ export function AppProvider({ children }) {
         email: currentUser.email // IMMUTABLE
       };
       setCurrentUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      localStorage.setItem('eduzenta_user', JSON.stringify(updatedUser));
+      safeStoreUser(updatedUser);
       setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
       addToast('Profile Updated', 'Your profile details have been saved in the database.', 'success');
       return { success: true, user: updatedUser };

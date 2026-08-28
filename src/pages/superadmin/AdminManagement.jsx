@@ -89,16 +89,16 @@ export default function AdminManagement() {
       });
 
       if (res?.school && res?.admin) {
+        // Pass REAL numeric DB ids — not string prefixes
         addSchoolAdmin({
-          id: `usr_${res.admin.id}`,
-          schoolId: res.school.id,
+          id: res.admin.id,           // Real numeric DB user id
+          schoolId: res.school.id,    // Real numeric DB school id
           schoolName: res.school.name,
           schoolLogoUrl,
-          firstName,
-          lastName,
           name: res.admin.name,
           email: res.admin.email,
-          password: adminPassword,
+          firstName,
+          lastName,
           phone,
           city
         });
@@ -115,6 +115,7 @@ export default function AdminManagement() {
       setIsSubmitting(false);
     }
   };
+
 
   const handleEditOpen = (user) => {
     setEditingUserId(user.id);

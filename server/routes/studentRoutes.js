@@ -3,14 +3,6 @@ import pool from '../config/db.js';
 
 const router = express.Router();
 
-// Fallback in-memory data if DB connection fails during development
-let mockStudents = [
-  { id: 'std_101', rollNo: '101', regNo: 'REG-2026-001', name: 'Zainab Fatima', classSection: 'Class 10-A', gender: 'Female', phone: '+92 300 1234567', guardianName: 'Tariq Mahmood', status: 'Active' },
-  { id: 'std_102', rollNo: '102', regNo: 'REG-2026-002', name: 'Muhammad Ali', classSection: 'Class 10-A', gender: 'Male', phone: '+92 300 7654321', guardianName: 'Raza Ali', status: 'Active' },
-  { id: 'std_103', rollNo: '103', regNo: 'REG-2026-003', name: 'Ayesha Khan', classSection: 'Class 10-A', gender: 'Female', phone: '+92 301 9876543', guardianName: 'Imran Khan', status: 'Active' },
-  { id: 'std_104', rollNo: '104', regNo: 'REG-2026-004', name: 'Bilal Ahmed', classSection: 'Class 9-B', gender: 'Male', phone: '+92 302 4567890', guardianName: 'Shahid Ahmed', status: 'Active' }
-];
-
 // GET /api/students — Fetch all student records (or filter by classSection)
 router.get('/', async (req, res) => {
   const { classSection } = req.query;
@@ -22,7 +14,7 @@ router.get('/', async (req, res) => {
       params = [classSection];
     }
     const [rows] = await pool.query(sql, params);
-    
+
     // Map snake_case DB columns to camelCase JSON props
     const formatted = rows.map(r => ({
       id: r.id,
@@ -41,12 +33,8 @@ router.get('/', async (req, res) => {
 
     return res.json({ success: true, count: formatted.length, data: formatted });
   } catch (error) {
-    console.warn('[STUDENTS API] Database query failed, returning fallback memory data:', error.message);
-    let filtered = mockStudents;
-    if (classSection) {
-      filtered = mockStudents.filter(s => s.classSection === classSection);
-    }
-    return res.json({ success: true, isMock: true, count: filtered.length, data: filtered });
+    console.error('[STUDENTS API GET ERROR]:', error);
+    return res.status(500).json({ success: false, error: 'Database error', message: error.message });
   }
 });
 
@@ -66,7 +54,7 @@ router.post('/', async (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
     `;
     await pool.query(sql, [studentId, rollNo, regNo || null, name, classSection || 'Class 10-A', gender || 'Male', phone || null, guardianName || null, targetPhoto]);
-    
+
     const newStudent = {
       id: studentId,
       rollNo,
@@ -83,22 +71,8 @@ router.post('/', async (req, res) => {
 
     return res.status(201).json({ success: true, message: 'Student enrolled successfully.', data: newStudent });
   } catch (error) {
-    console.warn('[STUDENTS API] Database insert failed, returning fallback success:', error.message);
-    const newStudent = {
-      id: studentId,
-      rollNo,
-      regNo,
-      name,
-      classSection: classSection || 'Class 10-A',
-      gender: gender || 'Male',
-      phone,
-      guardianName,
-      photo: targetPhoto,
-      photoUrl: targetPhoto,
-      status: 'Active'
-    };
-    mockStudents.unshift(newStudent);
-    return res.status(201).json({ success: true, isMock: true, message: 'Student enrolled locally.', data: newStudent });
+    console.error('[STUDENTS API POST ERROR]:', error);
+    return res.status(500).json({ success: false, error: 'Database error', message: error.message });
   }
 });
 
@@ -111,13 +85,14 @@ router.delete('/:id', async (req, res) => {
   }
 
   try {
-    await pool.query('DELETE FROM students WHERE id = ?', [studentId]);
-    mockStudents = mockStudents.filter(s => s.id !== studentId);
-    return res.json({ success: true, message: 'Student deleted successfully.', id: studentId });
+    const [result] = await pool.query('DELETE FROM students WHERE id = ?', [studentId]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'Student record not found in database.' });
+    }
+    return res.json({ success: true, message: 'Student deleted successfully.', deletedId: studentId });
   } catch (error) {
     console.error('[DELETE STUDENT ERROR]:', error);
-    mockStudents = mockStudents.filter(s => s.id !== studentId);
-    return res.json({ success: true, isMock: true, message: 'Student removed from local state.', id: studentId });
+    return res.status(500).json({ success: false, error: 'Database error', message: error.message });
   }
 });
 
