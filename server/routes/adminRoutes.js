@@ -44,6 +44,16 @@ router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, r
     } catch (_) { /* fallback ignored */ }
   }
 
+  // Strict Validation: Every non-SuperAdmin user MUST have a valid non-null school_id
+  const targetRoleClean = String(role || '').toLowerCase();
+  if (!targetSchoolId && targetRoleClean !== 'super_admin' && targetRoleClean !== 'superadmin') {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation Error',
+      message: 'Creation Failed: Every Admin and Teacher account strictly requires a valid, non-null school_id.'
+    });
+  }
+
   const cleanEmail = String(email).trim().toLowerCase();
   const targetAvatar = avatar || avatar_url || null;
 
@@ -95,7 +105,7 @@ router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, r
 });
 
 // ------------------------------------------------------------
-// GET /api/admin/users — List Users Scoped to School ID
+// GET /api/admin/users — List Users Scoped strictly to School ID
 // ------------------------------------------------------------
 router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => {
   try {
@@ -117,8 +127,15 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
     `;
     let params = [];
 
-    if (!isSuper && schoolId) {
-      query += ' WHERE u.school_id = ? OR u.school_id IS NULL';
+    if (!isSuper) {
+      if (!schoolId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation Error',
+          message: 'School Administrator must be linked to a valid school_id.'
+        });
+      }
+      query += ' WHERE u.school_id = ?';
       params.push(schoolId);
     }
 
@@ -135,6 +152,8 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
     return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
+
+
 
 
 // ------------------------------------------------------------

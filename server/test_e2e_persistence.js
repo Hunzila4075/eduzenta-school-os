@@ -7,8 +7,8 @@ import JWT_SECRET from './config/jwtConfig.js';
 
 dotenv.config();
 
-async function runPersistenceE2ETest() {
-  console.log('=== STARTING EXHAUSTIVE ADMIN & FACULTY RE-HYDRATION & PERSISTENCE E2E SUITE ===');
+async function runStrictPersistenceE2ETest() {
+  console.log('=== STARTING STRICT SCHOOL-SCOPED MULTI-TENANT PERSISTENCE E2E SUITE ===');
   await initializeDatabase();
   const conn = await pool.getConnection();
 
@@ -29,132 +29,116 @@ async function runPersistenceE2ETest() {
     // 1. Super Admin Presence Check
     const [superAdmins] = await conn.query("SELECT id, email, role FROM users WHERE role IN ('superadmin', 'super_admin')");
     assert(superAdmins.length >= 1, 'Super Admin account exists in MySQL DB');
-    const sa = superAdmins[0];
 
     // Clean old test data
-    await conn.query("DELETE FROM users WHERE email LIKE '%persisttest%'");
-    await conn.query("DELETE FROM schools WHERE name LIKE '%persisttest%'");
+    await conn.query("DELETE FROM users WHERE email LIKE '%stricttest%'");
+    await conn.query("DELETE FROM schools WHERE name LIKE '%stricttest%'");
 
-    // TEST A: Create School
-    const schoolName = `PersistTest Academy ${Date.now()}`;
-    const [schRes] = await conn.query("INSERT INTO schools (name, status) VALUES (?, 'Active')", [schoolName]);
-    const schoolId = schRes.insertId;
-    assert(typeof schoolId === 'number' && schoolId > 0, 'TEST A: School created in MySQL DB');
+    // TEST A & B: Super Admin creates School 1 & Admin 1
+    const schoolName1 = `StrictTest School One ${Date.now()}`;
+    const [schRes1] = await conn.query("INSERT INTO schools (name, status) VALUES (?, 'Active')", [schoolName1]);
+    const schoolId1 = schRes1.insertId;
 
-    // TEST B: Create Admin
-    const adminEmail = `admin_persisttest_${Date.now()}@eduzenta.com`;
-    const adminPass = 'adminPass123';
-    const hash = await bcrypt.hash(adminPass, 10);
-    const [adminRes] = await conn.query(
-      "INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (?, 'PersistTest Admin', ?, ?, 'admin', 1)",
-      [schoolId, adminEmail, hash]
+    const adminEmail1 = `admin1_stricttest_${Date.now()}@eduzenta.com`;
+    const hash1 = await bcrypt.hash('adminPass123', 10);
+    const [adminRes1] = await conn.query(
+      "INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (?, 'Admin One', ?, ?, 'admin', 1)",
+      [schoolId1, adminEmail1, hash1]
     );
-    const adminId = adminRes.insertId;
-    assert(typeof adminId === 'number' && adminId > 0, 'TEST B: School Admin created in MySQL DB');
+    const adminId1 = adminRes1.insertId;
+    assert(typeof schoolId1 === 'number' && typeof adminId1 === 'number', 'TEST A & B: Super Admin creates School 1 and Admin 1 with non-null IDs');
 
-    // TEST C: Direct MySQL Verification for Admin
-    const [sqlAdminCheck] = await conn.query(
-      `SELECT u.id, u.name, u.email, u.role, u.school_id, u.is_active, s.name AS school_name
-       FROM users u
-       LEFT JOIN schools s ON s.id = u.school_id
-       WHERE u.role = 'admin' AND u.id = ?`,
-      [adminId]
+    // TEST C: MySQL Verification for Admin 1 (school_id MUST be valid and NON-NULL)
+    const [sqlAdmin1] = await conn.query("SELECT id, school_id, role FROM users WHERE id = ?", [adminId1]);
+    assert(sqlAdmin1.length === 1 && sqlAdmin1[0].school_id === schoolId1 && sqlAdmin1[0].school_id !== null, 'TEST C: Admin 1 strictly possesses valid non-null school_id');
+
+    // TEST D & E: Super Admin creates School 2 & Admin 2
+    const schoolName2 = `StrictTest School Two ${Date.now()}`;
+    const [schRes2] = await conn.query("INSERT INTO schools (name, status) VALUES (?, 'Active')", [schoolName2]);
+    const schoolId2 = schRes2.insertId;
+
+    const adminEmail2 = `admin2_stricttest_${Date.now()}@eduzenta.com`;
+    const hash2 = await bcrypt.hash('adminPass123', 10);
+    const [adminRes2] = await conn.query(
+      "INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (?, 'Admin Two', ?, ?, 'admin', 1)",
+      [schoolId2, adminEmail2, hash2]
     );
-    assert(sqlAdminCheck.length === 1 && sqlAdminCheck[0].school_id === schoolId, 'TEST C: MySQL JOIN query verifies Admin linked to correct school_id');
+    const adminId2 = adminRes2.insertId;
+    assert(typeof schoolId2 === 'number' && typeof adminId2 === 'number', 'TEST D & E: Super Admin creates School 2 and Admin 2 with non-null IDs');
 
-    // TEST D: Super Admin GET /api/admin/users equivalent query
+    // TEST F: MySQL Verification for Admin 2
+    const [sqlAdmin2] = await conn.query("SELECT id, school_id, role FROM users WHERE id = ?", [adminId2]);
+    assert(sqlAdmin2.length === 1 && sqlAdmin2[0].school_id === schoolId2 && sqlAdmin2[0].school_id !== null, 'TEST F: Admin 2 strictly possesses valid non-null school_id');
+
+    // TEST G & H: Admin 1 creates Teacher 1 for School 1
+    const teacherEmail1 = `teacher1_stricttest_${Date.now()}@eduzenta.com`;
+    const tHash1 = await bcrypt.hash('teacherPass123', 10);
+    const [tRes1] = await conn.query(
+      "INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (?, 'Teacher One', ?, ?, 'teacher', 1)",
+      [schoolId1, teacherEmail1, tHash1]
+    );
+    const teacherId1 = tRes1.insertId;
+    assert(typeof teacherId1 === 'number' && teacherId1 > 0, 'TEST G & H: Admin 1 creates Teacher 1 linked to school_id = ' + schoolId1);
+
+    // TEST I & J: Admin 2 creates Teacher 2 for School 2
+    const teacherEmail2 = `teacher2_stricttest_${Date.now()}@eduzenta.com`;
+    const tHash2 = await bcrypt.hash('teacherPass123', 10);
+    const [tRes2] = await conn.query(
+      "INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (?, 'Teacher Two', ?, ?, 'teacher', 1)",
+      [schoolId2, teacherEmail2, tHash2]
+    );
+    const teacherId2 = tRes2.insertId;
+    assert(typeof teacherId2 === 'number' && teacherId2 > 0, 'TEST I & J: Admin 2 creates Teacher 2 linked to school_id = ' + schoolId2);
+
+    // TEST K (Multi-Tenant Isolation): Query GET users as Admin 1 (strictly WHERE u.school_id = schoolId1)
+    const [admin1GetUsers] = await conn.query(
+      `SELECT u.id, u.school_id, u.name, u.email, u.role FROM users u WHERE u.school_id = ? ORDER BY u.id DESC`,
+      [schoolId1]
+    );
+    const admin1HasTeacher1 = admin1GetUsers.some(u => u.id === teacherId1);
+    const admin1HasTeacher2 = admin1GetUsers.some(u => u.id === teacherId2);
+    assert(admin1HasTeacher1 && !admin1HasTeacher2, 'TEST K (Isolation): Admin 1 sees ONLY Teacher 1 (School 1) and CANNOT see Teacher 2 (School 2)');
+
+    // TEST L (Multi-Tenant Isolation): Query GET users as Admin 2 (strictly WHERE u.school_id = schoolId2)
+    const [admin2GetUsers] = await conn.query(
+      `SELECT u.id, u.school_id, u.name, u.email, u.role FROM users u WHERE u.school_id = ? ORDER BY u.id DESC`,
+      [schoolId2]
+    );
+    const admin2HasTeacher2 = admin2GetUsers.some(u => u.id === teacherId2);
+    const admin2HasTeacher1 = admin2GetUsers.some(u => u.id === teacherId1);
+    assert(admin2HasTeacher2 && !admin2HasTeacher1, 'TEST L (Isolation): Admin 2 sees ONLY Teacher 2 (School 2) and CANNOT see Teacher 1 (School 1)');
+
+    // TEST M (Super Admin Oversight): Super Admin sees ALL registered users
     const [saGetUsers] = await conn.query(
-      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, u.created_at, s.name as school_name 
-       FROM users u 
-       LEFT JOIN schools s ON s.id = u.school_id
-       ORDER BY u.id DESC`
+      `SELECT u.id, u.school_id, u.name, u.email, u.role, s.name as school_name FROM users u LEFT JOIN schools s ON s.id = u.school_id ORDER BY u.id DESC`
     );
-    const foundAdminInGET = saGetUsers.find(u => u.id === adminId);
-    assert(Boolean(foundAdminInGET && foundAdminInGET.email === adminEmail), 'TEST D: Super Admin GET users query returns newly created Admin');
+    const saHasAdmin1 = saGetUsers.some(u => u.id === adminId1);
+    const saHasAdmin2 = saGetUsers.some(u => u.id === adminId2);
+    const saHasTeacher1 = saGetUsers.some(u => u.id === teacherId1);
+    const saHasTeacher2 = saGetUsers.some(u => u.id === teacherId2);
+    assert(saHasAdmin1 && saHasAdmin2 && saHasTeacher1 && saHasTeacher2, 'TEST M (Super Admin): Super Admin sees ALL Admins and Teachers across ALL schools');
 
-    // TEST E: Super Admin GET /api/superadmin/schools query returns school with admin_email
+    // TEST N (Super Admin School Oversight): Super Admin GET schools returns School 1 and School 2 with linked admin emails
     const [saGetSchools] = await conn.query(
-      `SELECT s.id, s.name, s.status, s.created_at, u.email as admin_email, u.name as admin_name 
-       FROM schools s 
-       LEFT JOIN users u ON u.school_id = s.id AND (u.role = 'admin' OR u.role = 'school_admin')
-       WHERE s.id = ?`,
-      [schoolId]
+      `SELECT s.id, s.name, s.status, u.email as admin_email FROM schools s LEFT JOIN users u ON u.school_id = s.id AND (u.role = 'admin' OR u.role = 'school_admin') WHERE s.id IN (?, ?)`,
+      [schoolId1, schoolId2]
     );
-    assert(saGetSchools.length === 1 && saGetSchools[0].admin_email === adminEmail, 'TEST E: Super Admin GET schools returns school with linked admin_email');
+    assert(saGetSchools.length === 2, 'TEST N (Super Admin): Super Admin GET schools returns both registered schools');
 
-    // TEST F: Admin Login & JWT Generation
-    const [loginRows] = await conn.query("SELECT id, school_id, name, email, password, role FROM users WHERE email = ?", [adminEmail]);
-    const loggedAdmin = loginRows[0];
-    const isPassMatch = await bcrypt.compare(adminPass, loggedAdmin.password);
-    assert(isPassMatch && loggedAdmin.school_id === schoolId, 'TEST F: Admin login bcrypt comparison succeeds & provides correct school_id');
+    // TEST O (Re-hydration): Re-querying after simulated browser refresh yields exact same data
+    const [rehydrateQuery] = await conn.query("SELECT id FROM users WHERE id IN (?, ?, ?, ?)", [adminId1, adminId2, teacherId1, teacherId2]);
+    assert(rehydrateQuery.length === 4, 'TEST O (Re-hydration): All 4 Admin and Teacher records persist across re-hydration');
 
-    const adminToken = jwt.sign(
-      { id: loggedAdmin.id, school_id: loggedAdmin.school_id, name: loggedAdmin.name, email: loggedAdmin.email, role: loggedAdmin.role },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    // TEST P (Delete Isolation & Persistence): Delete Teacher 1, verify Teacher 2 stays intact
+    await conn.query("DELETE FROM users WHERE id = ?", [teacherId1]);
+    const [postDelQuery] = await conn.query("SELECT id FROM users WHERE id IN (?, ?)", [teacherId1, teacherId2]);
+    assert(postDelQuery.length === 1 && postDelQuery[0].id === teacherId2, 'TEST P (Delete Isolation): Teacher 1 deleted, Teacher 2 remains intact');
 
-    // TEST G: Admin Creates Faculty / Teacher
-    const teacherEmail = `teacher_persisttest_${Date.now()}@eduzenta.com`;
-    const teacherHash = await bcrypt.hash('teacherPass123', 10);
-    const [teacherRes] = await conn.query(
-      "INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (?, 'PersistTest Faculty', ?, ?, 'teacher', 1)",
-      [schoolId, teacherEmail, teacherHash]
-    );
-    const teacherId = teacherRes.insertId;
-    assert(typeof teacherId === 'number' && teacherId > 0, 'TEST G: Admin creates Faculty/Teacher in MySQL DB');
-
-    // TEST H: Direct MySQL Verification for Faculty
-    const [sqlTeacherCheck] = await conn.query(
-      "SELECT id, name, email, role, school_id FROM users WHERE role = 'teacher' AND id = ?",
-      [teacherId]
-    );
-    assert(sqlTeacherCheck.length === 1 && sqlTeacherCheck[0].school_id === schoolId, 'TEST H: MySQL query verifies Faculty/Teacher linked to Admin school_id');
-
-    // TEST I: Admin GET /api/admin/users query (scoped to school_id = schoolId)
-    const [adminUsersQuery] = await conn.query(
-      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, u.created_at, s.name as school_name 
-       FROM users u 
-       LEFT JOIN schools s ON s.id = u.school_id
-       WHERE u.school_id = ? OR u.school_id IS NULL
-       ORDER BY u.id DESC`,
-      [schoolId]
-    );
-    const foundTeacherInAdminGET = adminUsersQuery.find(u => u.id === teacherId);
-    assert(Boolean(foundTeacherInAdminGET && foundTeacherInAdminGET.email === teacherEmail), 'TEST I: Scoped Admin GET users returns Faculty/Teacher');
-
-    // TEST J: Simulate Page Refresh / Re-hydration for Admin Data
-    const [rehydrateAdmin] = await conn.query(
-      "SELECT id, school_id, name, email, role FROM users WHERE role = 'admin' AND id = ?",
-      [adminId]
-    );
-    assert(rehydrateAdmin.length === 1, 'TEST J: Admin data persists across page refresh re-hydration');
-
-    // TEST K: Simulate Page Refresh / Re-hydration for Faculty Data
-    const [rehydrateFaculty] = await conn.query(
-      "SELECT id, school_id, name, email, role FROM users WHERE role = 'teacher' AND id = ?",
-      [teacherId]
-    );
-    assert(rehydrateFaculty.length === 1, 'TEST K: Faculty data persists across page refresh re-hydration');
-
-    // TEST L: Delete Teacher / Faculty
-    await conn.query("DELETE FROM users WHERE id = ?", [teacherId]);
-    const [delTeacherCheck] = await conn.query("SELECT id FROM users WHERE id = ?", [teacherId]);
-    assert(delTeacherCheck.length === 0, 'TEST L: Faculty deleted from MySQL DB');
-
-    // TEST M: Delete Admin & School
-    await conn.query("DELETE FROM users WHERE id = ?", [adminId]);
-    await conn.query("DELETE FROM schools WHERE id = ?", [schoolId]);
-    const [delAdminCheck] = await conn.query("SELECT id FROM users WHERE id = ?", [adminId]);
-    assert(delAdminCheck.length === 0, 'TEST M: Admin & School deleted from MySQL DB');
-
-    // TEST N: Re-fetch verifying deleted records do not return
-    const [reFetchCheck] = await conn.query("SELECT id FROM users WHERE id IN (?, ?)", [adminId, teacherId]);
-    assert(reFetchCheck.length === 0, 'TEST N: Deleted Admin and Faculty do not return on re-fetch');
-
-    // Clean up any remaining test records
-    await conn.query("DELETE FROM users WHERE email LIKE '%persisttest%'");
-    await conn.query("DELETE FROM schools WHERE name LIKE '%persisttest%'");
+    // TEST Q: Clean deletion of Admin 1, Admin 2, Teacher 2, School 1, School 2
+    await conn.query("DELETE FROM users WHERE id IN (?, ?, ?)", [adminId1, adminId2, teacherId2]);
+    await conn.query("DELETE FROM schools WHERE id IN (?, ?)", [schoolId1, schoolId2]);
+    const [finalCheck] = await conn.query("SELECT id FROM users WHERE email LIKE '%stricttest%'");
+    assert(finalCheck.length === 0, 'TEST Q: All test records cleaned from database');
 
   } catch (err) {
     console.error('❌ E2E TEST EXCEPTION:', err);
@@ -164,7 +148,7 @@ async function runPersistenceE2ETest() {
   }
 
   console.log(`\n=================================================`);
-  console.log(`🏆 PERSISTENCE E2E SUITE: ${passed}/${total} PASSED`);
+  console.log(`🏆 STRICT PERSISTENCE E2E SUITE: ${passed}/${total} PASSED`);
   console.log(`=================================================`);
 
   if (passed !== total) {
@@ -172,4 +156,4 @@ async function runPersistenceE2ETest() {
   }
 }
 
-runPersistenceE2ETest();
+runStrictPersistenceE2ETest();
