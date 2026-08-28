@@ -18,10 +18,20 @@ export default function UniversalProfile() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
 
-  const handleProfileSubmit = (e) => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleProfileSubmit = async (e) => {
     e.preventDefault();
-    updateProfileInfo(name, avatar);
+    setIsSaving(true);
+    try {
+      await updateProfileInfo(name, avatar);
+    } catch (err) {
+      console.error('[UNIVERSAL PROFILE ERROR]:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
+
 
   const handleSecuritySubmit = (e) => {
     e.preventDefault();

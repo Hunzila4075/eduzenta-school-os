@@ -965,17 +965,25 @@ export function AppProvider({ children }) {
   };
 
   // Universal Profile Update (Persisted to DB)
-  const updateProfileInfo = async (updatedProfileData) => {
+  const updateProfileInfo = async (updatedProfileData, optionalAvatar) => {
     if (!currentUser) return { success: false, error: 'No user logged in' };
-    const nameToUpdate = updatedProfileData.name || `${updatedProfileData.firstName || ''} ${updatedProfileData.lastName || ''}`.trim() || currentUser.name;
-    const avatarToUpdate = updatedProfileData.avatar || updatedProfileData.avatar_url || updatedProfileData.schoolLogoUrl || null;
+
+    let payload = {};
+    if (typeof updatedProfileData === 'string') {
+      payload = { name: updatedProfileData, avatar: optionalAvatar };
+    } else if (updatedProfileData && typeof updatedProfileData === 'object') {
+      payload = updatedProfileData;
+    }
+
+    const nameToUpdate = payload.name || `${payload.firstName || ''} ${payload.lastName || ''}`.trim() || currentUser.name;
+    const avatarToUpdate = payload.avatar || payload.avatar_url || payload.schoolLogoUrl || null;
 
     try {
       const res = await updateProfileApi(nameToUpdate, avatarToUpdate);
       const dbUser = res.user || {};
       const updatedUser = {
         ...currentUser,
-        ...updatedProfileData,
+        ...payload,
         name: dbUser.name || nameToUpdate,
         avatar: dbUser.avatar_url || dbUser.avatar || avatarToUpdate || currentUser.avatar,
         avatar_url: dbUser.avatar_url || avatarToUpdate || currentUser.avatar_url,
@@ -984,15 +992,15 @@ export function AppProvider({ children }) {
       setCurrentUser(updatedUser);
       safeStoreUser(updatedUser);
       setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
-      addToast('Profile Updated', 'Your profile details have been saved in the database.', 'success');
+      addToast('Profile Updated', 'Profile updated successfully', 'success');
       return { success: true, user: updatedUser };
     } catch (err) {
       console.error('[PROFILE PERSISTENCE ERROR]:', err);
-      addToast('Profile Update Error', err.message || 'Failed to update profile in database.', 'warning');
-
+      addToast('Profile Update Failed', err.message || 'Failed to update profile in database.', 'warning');
       return { success: false, error: err.message };
     }
   };
+
 
   const resetPasswordSimple = async (newPass, currentPass = '') => {
     if (!newPass) return { success: false, error: 'New password required.' };

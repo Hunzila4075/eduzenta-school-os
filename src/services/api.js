@@ -1,6 +1,7 @@
 // Centralized Full-Stack API Client Service for Eduzenta School OS
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'https://eduzenta-school-os-production.up.railway.app/api';
+const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL) : null) || 'https://eduzenta-school-os-production.up.railway.app/api';
+
 
 // Helper function for unified fetch requests with error handling
 async function request(endpoint, options = {}) {
@@ -74,6 +75,24 @@ export async function checkHealth() {
   return request('/health');
 }
 
+// Safe localStorage helper for authentication & login session (strips large avatar base64 blobs)
+export function safeStoreUser(user) {
+  if (!user) return;
+  const lightweight = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    school_id: user.school_id || user.schoolId || null
+  };
+  try {
+    localStorage.setItem('user', JSON.stringify(lightweight));
+    localStorage.setItem('eduzenta_user', JSON.stringify(lightweight));
+  } catch (e) {
+    console.warn('[API SAFE STORE] Storage fallback:', e.message);
+  }
+}
+
 // 2. Auth: User Login (Super Admin & Staff)
 export async function loginUser(email, password) {
   const data = await request('/auth/login', {
@@ -85,13 +104,13 @@ export async function loginUser(email, password) {
     localStorage.setItem('token', data.token);
     localStorage.setItem('eduzenta_token', data.token);
     if (data.user) {
-      localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('eduzenta_user', JSON.stringify(data.user));
+      safeStoreUser(data.user);
     }
   }
 
   return data;
 }
+
 
 // 3. Auth: Fetch Live Profile for Authenticated Session
 export async function fetchMe() {

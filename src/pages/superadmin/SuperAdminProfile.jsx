@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import { handleLocalFileUpload } from '../../utils/fileUpload';
-import { User, Key, Camera, Upload, Save, ShieldCheck } from 'lucide-react';
+import { User, Key, Camera, Upload, Save, ShieldCheck, Loader2 } from 'lucide-react';
+
 
 export default function SuperAdminProfile() {
   const { currentUser, updateProfileInfo, resetPasswordSimple } = useApp();
@@ -32,18 +33,28 @@ export default function SuperAdminProfile() {
     }
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
-    await updateProfileInfo({
-      firstName,
-      middleName,
-      lastName,
-      name: `${firstName} ${lastName}`,
-      phone,
-      designation,
-      avatar
-    });
+    setIsSaving(true);
+    try {
+      await updateProfileInfo({
+        firstName,
+        middleName,
+        lastName,
+        name: `${firstName} ${lastName}`,
+        phone,
+        designation,
+        avatar
+      });
+    } catch (err) {
+      console.error('[SUPERADMIN PROFILE SUBMIT ERROR]:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
+
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -162,11 +173,13 @@ export default function SuperAdminProfile() {
 
               <button
                 type="submit"
-                className="w-full py-3 px-4 rounded-xl qobe-btn-primary text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2"
+                disabled={isSaving}
+                className="w-full py-3 px-4 rounded-xl qobe-btn-primary text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                <Save className="w-4 h-4" />
-                <span>Save Profile Information</span>
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isSaving ? 'Saving Profile Information...' : 'Save Profile Information'}</span>
               </button>
+
             </form>
           </div>
 
