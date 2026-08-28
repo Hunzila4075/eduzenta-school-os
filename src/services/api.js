@@ -79,7 +79,12 @@ export async function createSchoolAdmin(payload) {
   });
 }
 
-// 4. User Management: Create User Account (School Admin / Super Admin)
+// 4. Super Admin: Fetch Schools
+export async function fetchSchools() {
+  return request('/superadmin/schools');
+}
+
+// 5. User Management: Create User Account (School Admin / Super Admin)
 export async function createUser(userData) {
   // userData: { name, email, password, role }
   return request('/admin/create-user', {
@@ -88,13 +93,34 @@ export async function createUser(userData) {
   });
 }
 
-// 5. Fetch Students (optionally filter by classSection)
+// 6. User Management: Fetch Users Scoped to School ID
+export async function fetchUsers() {
+  return request('/admin/users');
+}
+
+// 7. Profile Update
+export async function updateProfile(name) {
+  return request('/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify({ name })
+  });
+}
+
+// 8. Password Update
+export async function updatePassword(currentPassword, newPassword) {
+  return request('/auth/change-password', {
+    method: 'PUT',
+    body: JSON.stringify({ currentPassword, newPassword })
+  });
+}
+
+// 9. Fetch Students (optionally filter by classSection)
 export async function fetchStudents(classSection = '') {
   const query = classSection ? `?classSection=${encodeURIComponent(classSection)}` : '';
   return request(`/students${query}`);
 }
 
-// 6. Add / Enrol New Student
+// 10. Add / Enrol New Student
 export async function addStudent(studentData) {
   return request('/students', {
     method: 'POST',
@@ -102,7 +128,7 @@ export async function addStudent(studentData) {
   });
 }
 
-// 7. Fetch Attendance Logs (optionally filter by classSection & date)
+// 11. Fetch Attendance Logs (optionally filter by classSection & date)
 export async function fetchAttendance(classSection = '', date = '') {
   const params = new URLSearchParams();
   if (classSection) params.append('classSection', classSection);
@@ -111,7 +137,7 @@ export async function fetchAttendance(classSection = '', date = '') {
   return request(`/attendance${queryString}`);
 }
 
-// 8. Save / Record Class Attendance
+// 12. Save / Record Class Attendance
 export async function saveAttendance(attendancePayload) {
   return request('/attendance', {
     method: 'POST',
@@ -119,13 +145,13 @@ export async function saveAttendance(attendancePayload) {
   });
 }
 
-// 9. Fetch Broadcast Notes / Directives
+// 13. Fetch Broadcast Notes / Directives
 export async function fetchBroadcasts(targetSchoolId = 'all') {
   const query = targetSchoolId ? `?targetSchoolId=${encodeURIComponent(targetSchoolId)}` : '';
   return request(`/broadcasts${query}`);
 }
 
-// 10. Create / Publish Broadcast Directive
+// 14. Create / Publish Broadcast Directive
 export async function createBroadcast(broadcastPayload) {
   return request('/broadcasts', {
     method: 'POST',

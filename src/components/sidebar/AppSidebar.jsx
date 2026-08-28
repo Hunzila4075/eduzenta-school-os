@@ -26,18 +26,22 @@ export default function AppSidebar() {
   if (!currentUser) return null;
 
   const role = currentUser.role;
+  const isSuperAdmin = role === 'superadmin' || role === 'super_admin';
+  const isAdmin = role === 'admin';
+  const isTeacher = role === 'teacher';
+
   const currentSchool = schools.find(s => s.id === currentUser.schoolId);
   const schoolLogo = currentSchool?.logoUrl || currentUser.schoolLogoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";
 
   let navItems = [];
 
-  if (role === 'superadmin') {
+  if (isSuperAdmin) {
     navItems = [
       { id: 'superadmin-dash', label: 'Platform Overview', icon: LayoutDashboard },
       { id: 'superadmin-admins', label: 'School Admin Control', icon: ShieldCheck },
       { id: 'superadmin-profile', label: 'Update My Profile', icon: User },
     ];
-  } else if (role === 'admin') {
+  } else if (isAdmin) {
     navItems = [
       { id: 'admin-dash', label: 'School Overview', icon: LayoutDashboard },
       { id: 'admin-teachers', label: 'Faculty Management', icon: UserCheck },
@@ -50,7 +54,7 @@ export default function AppSidebar() {
       { id: 'admin-profile', label: 'Update Profile', icon: User },
       { id: 'admin-password', label: 'Change Password', icon: Key },
     ];
-  } else if (role === 'teacher') {
+  } else if (isTeacher) {
     navItems = [
       { id: 'teacher-dash', label: 'Faculty Dashboard', icon: LayoutDashboard },
       { id: 'teacher-attendance', label: 'Lecture Register (Log)', icon: CalendarCheck },
@@ -69,12 +73,12 @@ export default function AppSidebar() {
 
   return (
     <>
-      {/* Top Mobile Header Bar */}
-      <div className="md:hidden sticky top-0 z-40 w-full bg-[#0B132B] border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md shrink-0">
+      {/* Top Mobile Header Bar (< 768px) */}
+      <div className="md:hidden sticky top-0 z-50 w-full bg-[#0B132B] border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsMobileOpen(!isMobileOpen)}
-            className="p-2 rounded-xl bg-slate-800/80 text-white hover:bg-slate-700 transition-colors focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2 rounded-xl bg-slate-800/80 text-white hover:bg-slate-700 transition-colors focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center z-50 cursor-pointer"
             aria-label="Toggle navigation drawer"
           >
             {isMobileOpen ? <X className="w-6 h-6 text-purple-400" /> : <Menu className="w-6 h-6 text-white" />}
@@ -84,10 +88,10 @@ export default function AppSidebar() {
 
         <div className="flex items-center gap-2.5">
           <span className="text-[10px] font-black uppercase text-purple-300 bg-purple-950/80 px-2 py-1 rounded-md border border-purple-800/60">
-            {role === 'superadmin' ? 'Super Admin' : role === 'admin' ? 'School Admin' : 'Faculty'}
+            {isSuperAdmin ? 'Super Admin' : isAdmin ? 'School Admin' : 'Faculty'}
           </span>
           <img
-            src={currentUser.avatar}
+            src={currentUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80"}
             alt={currentUser.name}
             className="w-8 h-8 rounded-full object-cover border border-purple-400/40"
           />
@@ -129,7 +133,7 @@ export default function AppSidebar() {
           />
           <div className="flex-1 min-w-0">
             <p className="text-[9px] font-black uppercase tracking-widest text-purple-400">
-              {role === 'superadmin' ? 'Super Admin HQ' : role === 'admin' ? 'School Admin' : 'Faculty Member'}
+              {isSuperAdmin ? 'Super Admin HQ' : isAdmin ? 'School Admin' : 'Faculty Member'}
             </p>
             <p className="text-xs font-bold text-white truncate leading-snug">
               {currentUser.schoolName || 'Eduzenta Platform'}
@@ -146,7 +150,7 @@ export default function AppSidebar() {
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition-all min-h-[44px] ${
+                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition-all min-h-[44px] cursor-pointer ${
                   isActive
                     ? 'bg-gradient-to-r from-[#5A3193] to-[#4C2A7B] text-white shadow-md shadow-purple-900/40'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -166,7 +170,7 @@ export default function AppSidebar() {
         <div className="p-4 border-t border-slate-800/80 bg-slate-950/60">
           <div className="flex items-center gap-3 mb-3">
             <img
-              src={currentUser.avatar}
+              src={currentUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80"}
               alt={currentUser.name}
               className="w-9 h-9 rounded-full object-cover border border-slate-700"
             />

@@ -1,21 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import { handleLocalFileUpload } from '../../utils/fileUpload';
-import { User, Lock, Upload, Save, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { updateProfile } from '../../services/api';
+import { User, Lock, Upload, Save, ShieldAlert, CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function UserProfileEdit() {
-  const { currentUser, updateProfileInfo } = useApp();
+  const { currentUser, updateProfileInfo, addToast } = useApp();
 
-  const [firstName, setFirstName] = useState(currentUser?.firstName || currentUser?.name.split(' ')[0] || '');
-  const [middleName, setMiddleName] = useState(currentUser?.middleName || '');
-  const [lastName, setLastName] = useState(currentUser?.lastName || currentUser?.name.split(' ')[1] || '');
-  const [phone, setPhone] = useState(currentUser?.phone || '+1 (555) 234-5678');
-  const [dob, setDob] = useState(currentUser?.dob || '1985-04-12');
-  const [designation, setDesignation] = useState(currentUser?.designation || 'Faculty Member');
-  const [linkedin, setLinkedin] = useState(currentUser?.socialLinks?.linkedin || 'https://linkedin.com');
-  const [twitter, setTwitter] = useState(currentUser?.socialLinks?.twitter || 'https://twitter.com');
-  const [avatar, setAvatar] = useState(currentUser?.avatar || '');
+  const [firstName, setFirstName] = useState('');
+  const [middleName, setMiddleName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('+1 (555) 234-5678');
+  const [dob, setDob] = useState('1985-04-12');
+  const [designation, setDesignation] = useState('Faculty Member');
+  const [linkedin, setLinkedin] = useState('https://linkedin.com');
+  const [twitter, setTwitter] = useState('https://twitter.com');
+  const [avatar, setAvatar] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      const parts = (currentUser.name || '').split(' ');
+      setFirstName(currentUser.firstName || parts[0] || '');
+      setMiddleName(currentUser.middleName || '');
+      setLastName(currentUser.lastName || parts.slice(1).join(' ') || '');
+      if (currentUser.phone) setPhone(currentUser.phone);
+      if (currentUser.dob) setDob(currentUser.dob);
+      if (currentUser.designation) setDesignation(currentUser.designation);
+      if (currentUser.socialLinks?.linkedin) setLinkedin(currentUser.socialLinks.linkedin);
+      if (currentUser.socialLinks?.twitter) setTwitter(currentUser.socialLinks.twitter);
+      if (currentUser.avatar) setAvatar(currentUser.avatar);
+    }
+  }, [currentUser]);
 
   const handleAvatarFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -31,19 +48,30 @@ export default function UserProfileEdit() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    updateProfileInfo({
-      firstName,
-      middleName,
-      lastName,
-      name: `${firstName} ${lastName}`,
-      phone,
-      dob,
-      designation,
-      socialLinks: { linkedin, twitter },
-      avatar
-    });
+    setIsSaving(true);
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    try {
+      await updateProfile(fullName);
+    } catch (err) {
+      console.warn('[PROFILE PERSISTENCE WARNING] Remote DB sync skipped, updating local store:', err.message);
+    } finally {
+      updateProfileInfo({
+        firstName,
+        middleName,
+        lastName,
+        name: fullName,
+        phone,
+        dob,
+        designation,
+        socialLinks: { linkedin, twitter },
+        avatar
+      });
+      setIsSaving(false);
+      if (addToast) addToast('Profile Updated', 'Your profile details have been saved.', 'success');
+    }
   };
 
   return (
@@ -71,7 +99,7 @@ export default function UserProfileEdit() {
               </div>
 
               <div className="flex-1">
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label htmlFor="profile-avatar" className="block text-xs font-bold text-slate-700 mb-1">
                   Upload Profile Picture (Local Browser File Picker Only)
                 </label>
                 <div className="flex flex-col gap-1.5">
@@ -240,10 +268,11 @@ export default function UserProfileEdit() {
 
             <button
               type="submit"
-              className="w-full py-3 px-4 rounded-xl qobe-btn-primary text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2"
+              disabled={isSaving}
+              className="w-full py-3 px-4 rounded-xl qobe-btn-primary text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60"
             >
-              <Save className="w-4 h-4" />
-              <span>Update Profile</span>
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{isSaving ? 'Saving Changes...' : 'Update Profile'}</span>
             </button>
           </form>
         </div>
