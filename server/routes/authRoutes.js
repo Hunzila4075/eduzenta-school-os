@@ -25,7 +25,7 @@ router.post('/login', async (req, res) => {
 
   try {
     const [rows] = await pool.query(
-      'SELECT id, school_id, name, email, password, role, is_active FROM users WHERE email = ?',
+      'SELECT id, school_id, name, email, password, role, avatar_url, is_active FROM users WHERE email = ?',
       [cleanEmail]
     );
 
@@ -78,7 +78,9 @@ router.post('/login', async (req, res) => {
         school_id: user.school_id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        avatar_url: user.avatar_url,
+        avatar: user.avatar_url
       }
     });
   } catch (error) {
@@ -105,7 +107,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const [rows] = await pool.query(
-      'SELECT id, school_id, name, email, role, is_active, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, school_id, name, email, role, avatar_url, is_active, created_at, updated_at FROM users WHERE id = ?',
       [userId]
     );
     const user = rows[0];
@@ -127,7 +129,10 @@ router.get('/me', authenticateToken, async (req, res) => {
 
     return res.json({
       success: true,
-      user
+      user: {
+        ...user,
+        avatar: user.avatar_url
+      }
     });
   } catch (error) {
     console.error('[GET AUTH ME ERROR]:', error);
@@ -140,10 +145,10 @@ router.get('/me', authenticateToken, async (req, res) => {
 });
 
 // ------------------------------------------------------------
-// PUT /api/auth/profile — Persistent Profile Update
+// PUT /api/auth/profile — Persistent Profile Update (Name & Profile Picture)
 // ------------------------------------------------------------
 router.put('/profile', authenticateToken, async (req, res) => {
-  const { name } = req.body;
+  const { name, avatar, avatar_url } = req.body;
   const userId = req.user.id;
 
   if (!name || !name.trim()) {
@@ -154,15 +159,31 @@ router.put('/profile', authenticateToken, async (req, res) => {
     });
   }
 
+  const targetAvatar = avatar || avatar_url || null;
+
   try {
-    await pool.query('UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [name.trim(), userId]);
-    const [rows] = await pool.query('SELECT id, school_id, name, email, role, is_active FROM users WHERE id = ?', [userId]);
+    if (targetAvatar) {
+      await pool.query(
+        'UPDATE users SET name = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [name.trim(), targetAvatar, userId]
+      );
+    } else {
+      await pool.query(
+        'UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [name.trim(), userId]
+      );
+    }
+
+    const [rows] = await pool.query('SELECT id, school_id, name, email, role, avatar_url, is_active FROM users WHERE id = ?', [userId]);
     const updatedUser = rows[0];
 
     return res.json({
       success: true,
       message: 'Profile updated successfully.',
-      user: updatedUser
+      user: {
+        ...updatedUser,
+        avatar: updatedUser.avatar_url
+      }
     });
   } catch (error) {
     console.error('[PROFILE UPDATE ERROR]:', error);

@@ -141,11 +141,11 @@ export async function deleteUser(id) {
   });
 }
 
-// 10. Profile Update
-export async function updateProfile(name) {
+// 10. Profile Update (Name & Profile Picture)
+export async function updateProfile(name, avatar) {
   return request('/auth/profile', {
     method: 'PUT',
-    body: JSON.stringify({ name })
+    body: JSON.stringify({ name, avatar, avatar_url: avatar })
   });
 }
 
@@ -168,6 +168,13 @@ export async function addStudent(studentData) {
   return request('/students', {
     method: 'POST',
     body: JSON.stringify(studentData)
+  });
+}
+
+// 14. Delete Student Record by ID
+export async function deleteStudent(id) {
+  return request(`/students/${id}`, {
+    method: 'DELETE'
   });
 }
 

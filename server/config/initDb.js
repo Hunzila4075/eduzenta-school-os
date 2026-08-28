@@ -51,6 +51,15 @@ export async function initializeDatabase() {
         // Column already exists, ignore
       }
 
+      // Ensure avatar_url column exists for profile pictures
+      try {
+        await connection.query(`
+          ALTER TABLE \`users\` ADD COLUMN \`avatar_url\` LONGTEXT DEFAULT NULL;
+        `);
+      } catch (err) {
+        // Column already exists, ignore
+      }
+
       // 3. Create CLASSES table
       await connection.query(`
         CREATE TABLE IF NOT EXISTS \`classes\` (

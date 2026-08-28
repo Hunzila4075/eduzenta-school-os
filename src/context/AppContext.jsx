@@ -13,8 +13,10 @@ import {
   fetchMe as fetchMeApi,
   fetchUsers as fetchUsersApi,
   fetchSchools as fetchSchoolsApi,
+  fetchStudents as fetchStudentsApi,
   updateUser as updateUserApi,
   deleteUser as deleteUserApi,
+  deleteStudent as deleteStudentApi,
   updateProfile as updateProfileApi,
   updatePassword as updatePasswordApi
 } from '../services/api';
@@ -45,9 +47,13 @@ export function AppProvider({ children }) {
         try {
           const meRes = await fetchMeApi();
           if (meRes?.user) {
-            setCurrentUser(prev => ({ ...(prev || {}), ...meRes.user }));
-            localStorage.setItem('user', JSON.stringify(meRes.user));
-            localStorage.setItem('eduzenta_user', JSON.stringify(meRes.user));
+            const userWithAvatar = {
+              ...meRes.user,
+              avatar: meRes.user.avatar_url || meRes.user.avatar || null
+            };
+            setCurrentUser(prev => ({ ...(prev || {}), ...userWithAvatar }));
+            localStorage.setItem('user', JSON.stringify(userWithAvatar));
+            localStorage.setItem('eduzenta_user', JSON.stringify(userWithAvatar));
           }
         } catch (err) {
           console.warn('[DB HYDRATION] fetchMe failed:', err.message);
@@ -64,6 +70,7 @@ export function AppProvider({ children }) {
               role: u.role,
               schoolId: u.school_id,
               schoolName: u.school_name || 'Eduzenta School',
+              avatar: u.avatar_url || u.avatar || null,
               isActive: Boolean(u.is_active),
               created_at: u.created_at
             }));
@@ -89,6 +96,30 @@ export function AppProvider({ children }) {
           }
         } catch (err) {
           console.warn('[DB HYDRATION] fetchSchools failed:', err.message);
+        }
+
+        // 4. Hydrate students list from MySQL DB
+        try {
+          const studentsRes = await fetchStudentsApi();
+          if (studentsRes?.data && Array.isArray(studentsRes.data)) {
+            const mappedStudents = studentsRes.data.map(st => ({
+              id: st.id,
+              rollNo: st.rollNo,
+              regNo: st.regNo,
+              name: st.name,
+              classSection: st.classSection,
+              gender: st.gender,
+              phone: st.phone,
+              guardianName: st.guardianName,
+              photo: st.photo || st.photoUrl || null,
+              photoUrl: st.photo || st.photoUrl || null,
+              status: st.status || 'Active',
+              createdAt: st.createdAt
+            }));
+            setStudents(mappedStudents);
+          }
+        } catch (err) {
+          console.warn('[DB HYDRATION] fetchStudents failed:', err.message);
         }
       }
     }
@@ -334,18 +365,6 @@ export function AppProvider({ children }) {
     setAttendanceOverrides(prev => (prev || []).filter(att => att.id !== attendanceId));
   };
 
-  // ====================
-  // Student CRUD enhancements
-  // ====================
-
-  const deleteStudent = (studentId) => {
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'superadmin')) {
-      addToast('Permission Denied', 'Only admins can delete student profiles.', 'warning');
-      return;
-    }
-    setStudents(prev => prev.filter(s => s.id !== studentId));
-    addToast('Student Removed', 'Student profile deleted.', 'warning');
-  };
 
   // ====================
   // Chalans management permission guards
@@ -715,9 +734,22 @@ export function AppProvider({ children }) {
     addToast('Teacher Updated', 'Faculty details saved.', 'success');
   };
 
-  const deleteTeacher = (teacherId) => {
-    setUsers(prev => prev.filter(u => u.id !== teacherId));
-    addToast('Teacher Removed', 'Faculty account deleted.', 'warning');
+  const deleteTeacher = async (teacherId) => {
+    const numericId = parseInt(String(teacherId).replace(/\D/g, ''));
+    try {
+      if (!isNaN(numericId) && numericId > 0) {
+        await deleteUserApi(numericId);
+      } else {
+        await deleteUserApi(teacherId);
+      }
+      setUsers(prev => prev.filter(u => u.id !== teacherId && u.id !== numericId));
+      addToast('Teacher Removed', 'Faculty account deleted from database.', 'warning');
+      return { success: true };
+    } catch (err) {
+      console.error('[DELETE TEACHER ERROR]:', err);
+      addToast('Deletion Failed', err.message || 'Failed to delete teacher from database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   // Student CRUD
@@ -753,6 +785,23 @@ export function AppProvider({ children }) {
     setStudents(prev => prev.map(s => s.id === id ? { ...s, status: s.status === 'Active' ? 'Deactivated' : 'Active' } : s));
 
     addToast('Status Toggled', 'Student active status updated.', 'info');
+  };
+
+  const deleteStudent = async (studentId) => {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'superadmin')) {
+      addToast('Permission Denied', 'Only admins can delete student profiles.', 'warning');
+      return { success: false, error: 'Permission denied' };
+    }
+    try {
+      await deleteStudentApi(studentId);
+      setStudents(prev => prev.filter(s => s.id !== studentId));
+      addToast('Student Removed', 'Student profile deleted from database.', 'warning');
+      return { success: true };
+    } catch (err) {
+      console.error('[DELETE STUDENT ERROR]:', err);
+      addToast('Deletion Failed', err.message || 'Failed to delete student from database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   const autoGenerateMonthlyChalans = (monthYear, dueDate, term = '1st Term', customFeeData = {}) => {
@@ -879,13 +928,17 @@ export function AppProvider({ children }) {
   const updateProfileInfo = async (updatedProfileData) => {
     if (!currentUser) return { success: false, error: 'No user logged in' };
     const nameToUpdate = updatedProfileData.name || `${updatedProfileData.firstName || ''} ${updatedProfileData.lastName || ''}`.trim() || currentUser.name;
+    const avatarToUpdate = updatedProfileData.avatar || updatedProfileData.avatar_url || updatedProfileData.schoolLogoUrl || null;
 
     try {
-      const res = await updateProfileApi(nameToUpdate);
+      const res = await updateProfileApi(nameToUpdate, avatarToUpdate);
+      const dbUser = res.user || {};
       const updatedUser = {
         ...currentUser,
         ...updatedProfileData,
-        name: res.user?.name || nameToUpdate,
+        name: dbUser.name || nameToUpdate,
+        avatar: dbUser.avatar_url || dbUser.avatar || avatarToUpdate || currentUser.avatar,
+        avatar_url: dbUser.avatar_url || avatarToUpdate || currentUser.avatar_url,
         email: currentUser.email // IMMUTABLE
       };
       setCurrentUser(updatedUser);
@@ -897,6 +950,7 @@ export function AppProvider({ children }) {
     } catch (err) {
       console.error('[PROFILE PERSISTENCE ERROR]:', err);
       addToast('Profile Update Error', err.message || 'Failed to update profile in database.', 'warning');
+
       return { success: false, error: err.message };
     }
   };

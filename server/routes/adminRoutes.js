@@ -10,7 +10,7 @@ const router = express.Router();
 // Protected by School Admin Auth. Automatically scopes user to school_id
 // ------------------------------------------------------------
 router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, res) => {
-  const { name, email, password, role, school_id } = req.body;
+  const { name, email, password, role, school_id, avatar, avatar_url } = req.body;
 
   if (!name || !email || !password || !role) {
     return res.status(400).json({
@@ -35,6 +35,7 @@ router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, r
   const targetSchoolId = isSuper ? (school_id || req.user.school_id || null) : req.user.school_id;
 
   const cleanEmail = String(email).trim().toLowerCase();
+  const targetAvatar = avatar || avatar_url || null;
 
   try {
     const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [cleanEmail]);
@@ -48,8 +49,8 @@ router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, r
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
-      `INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (?, ?, ?, ?, ?, TRUE)`,
-      [targetSchoolId, name.trim(), cleanEmail, hashedPassword, role]
+      `INSERT INTO users (school_id, name, email, password, role, avatar_url, is_active) VALUES (?, ?, ?, ?, ?, ?, TRUE)`,
+      [targetSchoolId, name.trim(), cleanEmail, hashedPassword, role, targetAvatar]
     );
 
     return res.status(201).json({
@@ -61,6 +62,8 @@ router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, r
         name: name.trim(),
         email: cleanEmail,
         role,
+        avatar_url: targetAvatar,
+        avatar: targetAvatar,
         is_active: true
       }
     });
@@ -82,7 +85,7 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
     const userRole = String(req.user.role || '').toLowerCase();
     const isSuper = userRole === 'super_admin' || userRole === 'superadmin';
 
-    let query = 'SELECT id, school_id, name, email, role, is_active, created_at FROM users';
+    let query = 'SELECT id, school_id, name, email, role, avatar_url, is_active, created_at FROM users';
     let params = [];
 
     if (!isSuper && schoolId) {
@@ -93,7 +96,11 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
     query += ' ORDER BY id DESC';
 
     const [users] = await pool.query(query, params);
-    return res.json({ success: true, users });
+    const formattedUsers = users.map(u => ({
+      ...u,
+      avatar: u.avatar_url
+    }));
+    return res.json({ success: true, users: formattedUsers });
   } catch (error) {
     console.error('[GET USERS ERROR]:', error);
     return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
@@ -105,7 +112,7 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
 // ------------------------------------------------------------
 router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const { name, school_name, schoolName } = req.body;
+  const { name, school_name, schoolName, avatar, avatar_url } = req.body;
 
   if (isNaN(userId)) {
     return res.status(400).json({
@@ -117,6 +124,7 @@ router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res)
 
   const cleanName = name ? String(name).trim() : null;
   const targetSchoolName = (school_name || schoolName) ? String(school_name || schoolName).trim() : null;
+  const targetAvatar = avatar || avatar_url || null;
 
   try {
     const [existing] = await pool.query('SELECT id, school_id, name, email, role FROM users WHERE id = ?', [userId]);
@@ -130,9 +138,13 @@ router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res)
       });
     }
 
-    // Update user record if name provided
-    if (cleanName) {
+    // Update user record if name or avatar provided
+    if (cleanName && targetAvatar) {
+      await pool.query('UPDATE users SET name = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [cleanName, targetAvatar, userId]);
+    } else if (cleanName) {
       await pool.query('UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [cleanName, userId]);
+    } else if (targetAvatar) {
+      await pool.query('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [targetAvatar, userId]);
     }
 
     // Update school name if school_id exists and school_name provided
@@ -141,17 +153,22 @@ router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res)
     }
 
     const [updatedRows] = await pool.query(
-      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.is_active, s.name as school_name 
+      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, s.name as school_name 
        FROM users u 
        LEFT JOIN schools s ON s.id = u.school_id 
        WHERE u.id = ?`,
       [userId]
     );
 
+    const updatedUser = updatedRows[0];
+
     return res.json({
       success: true,
       message: 'User record updated successfully.',
-      user: updatedRows[0]
+      user: {
+        ...updatedUser,
+        avatar: updatedUser ? updatedUser.avatar_url : null
+      }
     });
   } catch (error) {
     console.error('[UPDATE USER ERROR]:', error);
