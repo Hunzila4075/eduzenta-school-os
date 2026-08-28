@@ -25,10 +25,10 @@ export default function AppSidebar() {
 
   if (!currentUser) return null;
 
-  const role = currentUser.role;
-  const isSuperAdmin = role === 'superadmin' || role === 'super_admin';
-  const isAdmin = role === 'admin';
-  const isTeacher = role === 'teacher';
+  const roleStr = String(currentUser?.role || '').toLowerCase();
+  const isSuperAdmin = roleStr === 'superadmin' || roleStr === 'super_admin';
+  const isAdmin = roleStr === 'admin';
+  const isTeacher = roleStr === 'teacher';
 
   const currentSchool = schools.find(s => s.id === currentUser.schoolId);
   const schoolLogo = currentSchool?.logoUrl || currentUser.schoolLogoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import EduzentaLogo from '../../components/common/EduzentaLogo';
 import Modal from '../../components/common/Modal';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, AlertCircle, HelpCircle } from 'lucide-react';
+import { loginUser as loginUserApi } from '../../services/api';
+import { Eye, EyeOff, Lock, Mail, ArrowRight, AlertCircle, HelpCircle, Loader2 } from 'lucide-react';
 
 export default function UnifiedLoginPage() {
   const { loginUser, setCurrentView, addToast } = useApp();
@@ -11,6 +12,7 @@ export default function UnifiedLoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   
   // Validation State
   const [inlineError, setInlineError] = useState('');
@@ -19,7 +21,7 @@ export default function UnifiedLoginPage() {
   // Forgot Password "Contact your admin" Modal State
   const [contactAdminModalOpen, setContactAdminModalOpen] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setInlineError('');
     setEmailHasError(false);
@@ -32,6 +34,23 @@ export default function UnifiedLoginPage() {
     if (!password) {
       setInlineError('Password field cannot be blank.');
       return;
+    }
+
+    setIsLoggingIn(true);
+
+    try {
+      const apiRes = await loginUserApi(email, password);
+      if (apiRes?.token) {
+        localStorage.setItem('token', apiRes.token);
+        localStorage.setItem('eduzenta_token', apiRes.token);
+        if (apiRes.user) {
+          localStorage.setItem('eduzenta_user', JSON.stringify(apiRes.user));
+        }
+      }
+    } catch (err) {
+      console.warn('[LOGIN API WARNING] Remote backend auth error:', err.message);
+    } finally {
+      setIsLoggingIn(false);
     }
 
     const result = loginUser(email, password);
@@ -53,14 +72,14 @@ export default function UnifiedLoginPage() {
       <div className="absolute top-6 left-6">
         <button
           onClick={() => setCurrentView('landing')}
-          className="text-xs font-bold text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 bg-slate-900/60 px-3.5 py-1.5 rounded-xl backdrop-blur-md border border-slate-700/60 shadow-sm"
+          className="text-xs font-bold text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 bg-slate-900/60 px-3.5 py-1.5 rounded-xl backdrop-blur-md border border-slate-700/60 shadow-sm min-h-[44px]"
         >
           ← Return to Public Website
         </button>
       </div>
 
       {/* QOBE Faculty Login Card */}
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-2xl relative z-10">
+      <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-2xl relative z-10 mx-auto">
         {/* Card Header matching exact spec */}
         <div className="flex flex-col items-center text-center mb-6">
           <EduzentaLogo variant="brand" className="h-10 mb-3" />
@@ -129,7 +148,7 @@ export default function UnifiedLoginPage() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 min-h-[36px] min-w-[36px] flex items-center justify-center"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -154,10 +173,12 @@ export default function UnifiedLoginPage() {
           {/* Action Button: Solid QOBE Purple */}
           <button
             type="submit"
-            className="w-full py-3 px-4 rounded-xl qobe-btn-primary text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.99]"
+            disabled={isLoggingIn}
+            className="w-full py-3 px-4 rounded-xl qobe-btn-primary text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60 min-h-[44px]"
           >
-            <span>Login</span>
-            <ArrowRight className="w-4 h-4" />
+            {isLoggingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            <span>{isLoggingIn ? 'Authenticating...' : 'Login'}</span>
+            {!isLoggingIn && <ArrowRight className="w-4 h-4" />}
           </button>
         </form>
 
@@ -165,7 +186,7 @@ export default function UnifiedLoginPage() {
         <div className="mt-6 pt-4 border-t border-slate-100 text-center text-xs font-semibold">
           <button
             onClick={handleForgotPasswordClick}
-            className="text-slate-500 hover:text-[#5A3193] transition-colors"
+            className="text-slate-500 hover:text-[#5A3193] transition-colors min-h-[36px]"
           >
             If you forgot your password you can reset it.
           </button>
@@ -192,7 +213,7 @@ export default function UnifiedLoginPage() {
           <div className="pt-2 flex justify-center">
             <button
               onClick={() => setContactAdminModalOpen(false)}
-              className="px-6 py-2.5 rounded-xl qobe-btn-primary text-xs font-bold shadow-sm"
+              className="px-6 py-2.5 rounded-xl qobe-btn-primary text-xs font-bold shadow-sm min-h-[44px]"
             >
               OK, Got It
             </button>

@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_A
 // Helper function for unified fetch requests with error handling
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
-  const token = localStorage.getItem('eduzenta_token');
+  const token = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
 
   const defaultHeaders = {
     'Content-Type': 'application/json',
@@ -27,12 +27,13 @@ async function request(endpoint, options = {}) {
     // Explicit error handling for 401 Unauthorized / Token Expired
     if (response.status === 401) {
       const data = await response.json().catch(() => ({}));
-      if (data.error === 'TokenExpired' || data.message?.includes('expired')) {
-        console.warn('[API SERVICE WARNING] Session token expired. Clearing local auth.');
+      if (data.error === 'TokenExpired' || data.message?.includes('expired') || data.message?.includes('jwt')) {
+        console.warn('[API SERVICE WARNING] Session token expired or invalid. Clearing local auth.');
+        localStorage.removeItem('token');
         localStorage.removeItem('eduzenta_token');
         localStorage.removeItem('eduzenta_user');
       }
-      throw new Error(data.message || data.error || 'Session expired. Please log in again.');
+      throw new Error(data.message || data.error || 'Session expired or unauthorized. Please log in again.');
     }
 
     // Explicit error handling for 504 Gateway / Database Timeout
@@ -64,10 +65,20 @@ export async function checkHealth() {
 
 // 2. Auth: User Login (Super Admin & Staff)
 export async function loginUser(email, password) {
-  return request('/auth/login', {
+  const data = await request('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password })
   });
+
+  if (data?.token) {
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('eduzenta_token', data.token);
+    if (data.user) {
+      localStorage.setItem('eduzenta_user', JSON.stringify(data.user));
+    }
+  }
+
+  return data;
 }
 
 // 3. Super Admin: Onboard New School & Assign School Admin
