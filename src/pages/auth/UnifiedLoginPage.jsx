@@ -39,24 +39,16 @@ export default function UnifiedLoginPage() {
     setIsLoggingIn(true);
 
     try {
-      const apiRes = await loginUserApi(email, password);
-      if (apiRes?.token) {
-        localStorage.setItem('token', apiRes.token);
-        localStorage.setItem('eduzenta_token', apiRes.token);
-        if (apiRes.user) {
-          localStorage.setItem('eduzenta_user', JSON.stringify(apiRes.user));
-        }
+      const result = await loginUser(email, password);
+      if (!result.success && !result.locked) {
+        setEmailHasError(true);
+        setInlineError(result.error || 'Invalid Credentials. Please check assigned email and password.');
       }
     } catch (err) {
-      console.warn('[LOGIN API WARNING] Remote backend auth error:', err.message);
+      setEmailHasError(true);
+      setInlineError(err.message || 'Login failed. Please check your network connection.');
     } finally {
       setIsLoggingIn(false);
-    }
-
-    const result = loginUser(email, password);
-    if (!result.success && !result.locked) {
-      setEmailHasError(true);
-      setInlineError(result.error || 'Invalid Credentials. Please check assigned email and password.');
     }
   };
 

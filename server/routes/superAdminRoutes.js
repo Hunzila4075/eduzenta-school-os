@@ -15,6 +15,7 @@ router.post('/create-school-admin', authenticateToken, requireSuperAdmin, async 
 
   if (!school_name || !admin_email || !admin_password) {
     return res.status(400).json({
+      success: false,
       error: 'Validation Error',
       message: 'school_name, admin_email, and admin_password are required.'
     });
@@ -34,6 +35,7 @@ router.post('/create-school-admin', authenticateToken, requireSuperAdmin, async 
     if (existing && existing.length > 0) {
       await connection.rollback();
       return res.status(409).json({
+        success: false,
         error: 'Conflict Error',
         message: 'A user account with this email address already exists.'
       });
@@ -57,6 +59,7 @@ router.post('/create-school-admin', authenticateToken, requireSuperAdmin, async 
     await connection.commit();
 
     return res.status(201).json({
+      success: true,
       message: 'School and School Admin created successfully.',
       school: {
         id: schoolId,
@@ -76,9 +79,9 @@ router.post('/create-school-admin', authenticateToken, requireSuperAdmin, async 
     await connection.rollback();
     console.error('[CREATE SCHOOL ADMIN ERROR]:', error);
     if (error.code === 'PROTOCOL_CONNECTION_LOST' || error.code === 'ETIMEDOUT') {
-      return res.status(504).json({ error: 'Database Timeout', message: 'Database query timed out.' });
+      return res.status(504).json({ success: false, error: 'Database Timeout', message: 'Database query timed out.' });
     }
-    return res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   } finally {
     connection.release();
   }
@@ -95,10 +98,10 @@ router.get('/schools', authenticateToken, requireSuperAdmin, async (req, res) =>
        LEFT JOIN users u ON u.school_id = s.id AND u.role = 'admin'
        ORDER BY s.id DESC`
     );
-    return res.json({ schools });
+    return res.json({ success: true, schools });
   } catch (error) {
     console.error('[GET SCHOOLS ERROR]:', error);
-    return res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
 

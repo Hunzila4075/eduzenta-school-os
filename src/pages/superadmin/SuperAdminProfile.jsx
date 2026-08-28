@@ -32,9 +32,9 @@ export default function SuperAdminProfile() {
     }
   };
 
-  const handleProfileSubmit = (e) => {
+  const handleProfileSubmit = async (e) => {
     e.preventDefault();
-    updateProfileInfo({
+    await updateProfileInfo({
       firstName,
       middleName,
       lastName,
@@ -45,15 +45,17 @@ export default function SuperAdminProfile() {
     });
   };
 
-  const handlePasswordSubmit = (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     if (!newPassword || newPassword !== confirmPassword) {
       alert("New password and confirm password do not match.");
       return;
     }
-    resetPasswordSimple(newPassword);
-    setNewPassword('');
-    setConfirmPassword('');
+    const res = await resetPasswordSimple(newPassword);
+    if (res?.success) {
+      setNewPassword('');
+      setConfirmPassword('');
+    }
   };
 
   return (

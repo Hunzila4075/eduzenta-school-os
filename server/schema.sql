@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` ENUM('super_admin', 'admin', 'teacher', 'student', 'parent') NOT NULL DEFAULT 'admin',
   `is_active` BOOLEAN DEFAULT TRUE,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_school_id` (`school_id`),
   FOREIGN KEY (`school_id`) REFERENCES `schools` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

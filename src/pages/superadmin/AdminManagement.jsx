@@ -81,29 +81,38 @@ export default function AdminManagement() {
     const adminPassword = password || 'school123';
 
     try {
-      // Async API Call to backend
-      await createSchoolAdminApi({
+      const res = await createSchoolAdminApi({
         school_name: schoolName,
         admin_name: adminFullName,
         admin_email: email,
         admin_password: adminPassword
       });
+
+      if (res?.school && res?.admin) {
+        addSchoolAdmin({
+          id: `usr_${res.admin.id}`,
+          schoolId: res.school.id,
+          schoolName: res.school.name,
+          schoolLogoUrl,
+          firstName,
+          lastName,
+          name: res.admin.name,
+          email: res.admin.email,
+          password: adminPassword,
+          phone,
+          city
+        });
+        addToast('School Admin Onboarded', `School "${res.school.name}" created with Admin "${res.admin.name}".`, 'success');
+        setIsAddModalOpen(false);
+        resetForm();
+      } else {
+        throw new Error(res?.message || 'Failed to create school admin.');
+      }
     } catch (err) {
-      console.warn('[ADMIN CREATION API WARNING] Remote DB sync skipped, adding to local store:', err.message);
+      console.error('[ADMIN CREATION API ERROR]:', err);
+      addToast('Onboarding Failed', err.message || 'Failed to create school admin in database.', 'warning');
     } finally {
-      addSchoolAdmin({
-        schoolName,
-        schoolLogoUrl,
-        firstName,
-        lastName,
-        email,
-        password: adminPassword,
-        phone,
-        city
-      });
       setIsSubmitting(false);
-      setIsAddModalOpen(false);
-      resetForm();
     }
   };
 

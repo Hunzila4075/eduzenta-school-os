@@ -23,12 +23,11 @@ async function request(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
-    
-    // Explicit error handling for 401 Unauthorized / 403 Forbidden - Auto Purge
-    // NOTE: Skip purge for auth routes (login/register) to avoid redirect loops on bad credentials
     const isAuthRoute = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
-    if (!isAuthRoute && (response.status === 401 || response.status === 403)) {
-      console.warn('[API SERVICE WARNING] Session token expired or unauthorized. Purging local credentials and redirecting to login.');
+    
+    // Explicit error handling for 401 Unauthorized - Purge session only on 401
+    if (!isAuthRoute && response.status === 401) {
+      console.warn('[API SERVICE WARNING] Session token invalid or expired (401). Purging local credentials.');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('eduzenta_token');
@@ -37,10 +36,16 @@ async function request(endpoint, options = {}) {
       throw new Error(data.message || data.error || 'Session expired or unauthorized. Please log in again.');
     }
 
-    if (response.status === 401 || response.status === 403) {
-      // Auth route returned 401/403 — wrong credentials, just throw without purging
+    if (response.status === 401) {
+      // Auth route returned 401 — invalid credentials
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || data.error || 'Invalid credentials. Please try again.');
+      throw new Error(data.message || data.error || 'Invalid credentials. Please check your email and password.');
+    }
+
+    // 403 Forbidden - Authenticated user lacks permission. DO NOT PURGE TOKEN.
+    if (response.status === 403) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'Access forbidden: Insufficient permissions.');
     }
 
     // Explicit error handling for 504 Gateway / Database Timeout
@@ -48,10 +53,10 @@ async function request(endpoint, options = {}) {
       throw new Error('Database response timeout. Please try again.');
     }
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(data.error || data.message || `HTTP Error ${response.status}`);
+      throw new Error(data.message || data.error || `HTTP Error ${response.status}`);
     }
 
     return data;

@@ -54,11 +54,7 @@ export default function UserProfileEdit() {
     const fullName = `${firstName} ${lastName}`.trim();
 
     try {
-      await updateProfile(fullName);
-    } catch (err) {
-      console.warn('[PROFILE PERSISTENCE WARNING] Remote DB sync skipped, updating local store:', err.message);
-    } finally {
-      updateProfileInfo({
+      await updateProfileInfo({
         firstName,
         middleName,
         lastName,
@@ -69,8 +65,10 @@ export default function UserProfileEdit() {
         socialLinks: { linkedin, twitter },
         avatar
       });
+    } catch (err) {
+      console.error('[PROFILE EDIT ERROR]:', err);
+    } finally {
       setIsSaving(false);
-      if (addToast) addToast('Profile Updated', 'Your profile details have been saved.', 'success');
     }
   };
 

@@ -28,6 +28,7 @@ export async function initializeDatabase() {
           \`role\` ENUM('super_admin', 'admin', 'teacher', 'student', 'parent') NOT NULL DEFAULT 'admin',
           \`is_active\` TINYINT(1) DEFAULT 1,
           \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           INDEX \`idx_school_id\` (\`school_id\`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
@@ -36,6 +37,15 @@ export async function initializeDatabase() {
       try {
         await connection.query(`
           ALTER TABLE \`users\` ADD COLUMN \`school_id\` INT DEFAULT NULL AFTER \`id\`;
+        `);
+      } catch (err) {
+        // Column already exists, ignore
+      }
+
+      // Ensure updated_at column exists if table existed previously without it
+      try {
+        await connection.query(`
+          ALTER TABLE \`users\` ADD COLUMN \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
         `);
       } catch (err) {
         // Column already exists, ignore
@@ -122,31 +132,25 @@ export async function initializeDatabase() {
         // Column already exists, ignore
       }
 
-      // 7. SUPER ADMIN UPSERT — ALWAYS FORCE-UPDATE PASSWORD HASH ON EVERY RESTART
-      const superAdminEmail = 'developerwithkhan804@gmail.com';
-      const hashedPassword = await bcrypt.hash('admin123', 10);
+      // 7. SUPER ADMIN SEED — ONLY CREATE IF NOT EXISTS (DO NOT OVERWRITE ON RESTART)
+      const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'developerwithkhan804@gmail.com';
+      const rawSeedPassword = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
 
-      // Step A: Ensure the super admin row exists
       const [existingUser] = await connection.query(
-        'SELECT id FROM users WHERE email = ?',
+        'SELECT id, email, role FROM users WHERE email = ?',
         [superAdminEmail]
       );
 
       if (!existingUser || existingUser.length === 0) {
-        // Insert fresh record
+        const hashedPassword = await bcrypt.hash(rawSeedPassword, 10);
         await connection.query(
           `INSERT INTO users (school_id, name, email, password, role, is_active) VALUES (NULL, ?, ?, ?, 'super_admin', 1)`,
           ['Eduzenta Super Admin', superAdminEmail, hashedPassword]
         );
-        console.log(`✅ Super Admin Account Seeded: ${superAdminEmail} (password: admin123)`);
+        console.log(`✅ Super Admin Account Seeded: ${superAdminEmail}`);
+      } else {
+        console.log(`ℹ️ Super Admin Account Verified in Database: ${superAdminEmail}`);
       }
-
-      // Step B: ALWAYS force-update the password hash to admin123 (fixes stale/corrupt hashes)
-      await connection.query(
-        `UPDATE users SET password = ?, name = 'Eduzenta Super Admin', role = 'super_admin', is_active = 1 WHERE email = ?`,
-        [hashedPassword, superAdminEmail]
-      );
-      console.log(`✅ Super Admin Password Force-Updated with fresh bcrypt hash: ${superAdminEmail} → admin123`);
 
     } finally {
       connection.release();

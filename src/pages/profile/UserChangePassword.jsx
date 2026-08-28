@@ -9,15 +9,17 @@ export default function UserChangePassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password || password !== confirmPassword) {
       alert("Password and Confirm Password do not match.");
       return;
     }
-    resetPasswordSimple(password);
-    setPassword('');
-    setConfirmPassword('');
+    const res = await resetPasswordSimple(password);
+    if (res?.success) {
+      setPassword('');
+      setConfirmPassword('');
+    }
   };
 
   return (

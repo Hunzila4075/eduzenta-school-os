@@ -8,6 +8,11 @@ import {
   MOCK_REMINDERS,
   MOCK_LECTURE_REGISTER
 } from '../utils/initialData';
+import {
+  loginUser as loginUserApi,
+  updateProfile as updateProfileApi,
+  updatePassword as updatePasswordApi
+} from '../services/api';
 
 const AppContext = createContext();
 
@@ -435,61 +440,19 @@ export function AppProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Unified QOBE Login Handler
-  const loginUser = (email, password) => {
-    if (!email || !email.trim()) {
-      return { success: false, error: 'User Name cannot be blank.' };
+  // Session login helper after successful backend API verification
+  const loginWithSession = (user, token) => {
+    if (!user || !token) {
+      return { success: false, error: 'Invalid authentication session response.' };
     }
 
-    const trimmedEmail = email.trim().toLowerCase();
-    let user = users.find(u => u.email.toLowerCase() === trimmedEmail);
-
-    // Fallback for Super Admin
-    if (!user && (trimmedEmail === 'developerwithkhan804@gmail.com' || trimmedEmail === 'superadmin@eduzenta.com')) {
-      user = {
-        id: "usr_superadmin",
-        name: "Eduzenta Super Admin",
-        email: trimmedEmail,
-        role: "superadmin",
-        schoolId: null,
-        schoolName: "Eduzenta Corporate HQ",
-        locked: false
-      };
-    }
-
-    if (!user) {
-      return { success: false, error: 'Invalid Credentials. Please check assigned email and password.' };
-    }
-
-    if (user.locked) {
-      setLockedModal({
-        open: true,
-        email: user.email,
-        message: 'ACCESS BLOCKED: Pending Payment Required. Please contact system administrator.'
-      });
-      return { success: false, locked: true };
-    }
-
-    if (user.schoolId) {
-      const sch = schools.find(s => s.id === user.schoolId);
-      if (sch && sch.status.includes('Locked')) {
-        setLockedModal({
-          open: true,
-          email: user.email,
-          message: `ACCESS BLOCKED: ${sch.name} is currently suspended due to Pending Payment. Please contact system administrator.`
-        });
-        return { success: false, locked: true };
-      }
-    }
-
-    const token = user.token || `jwt_token_${Date.now()}`;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('eduzenta_token', token);
     localStorage.setItem('eduzenta_user', JSON.stringify(user));
 
     setCurrentUser(user);
-    addToast('Authentication Success', `Automated security confirmation sent to ${user.email}`, 'success');
+    addToast('Authentication Success', `Welcome back, ${user.name || user.email}`, 'success');
 
     const roleStr = String(user.role || '').toLowerCase();
     if (roleStr === 'superadmin' || roleStr === 'super_admin') {
@@ -498,9 +461,31 @@ export function AppProvider({ children }) {
       setCurrentView('admin-dash');
     } else if (roleStr === 'teacher') {
       setCurrentView('teacher-dash');
+    } else {
+      setCurrentView('admin-dash');
     }
 
     return { success: true };
+  };
+
+  // Unified Real API Login Handler
+  const loginUser = async (email, password) => {
+    if (!email || !email.trim()) {
+      return { success: false, error: 'User Name cannot be blank.' };
+    }
+    if (!password) {
+      return { success: false, error: 'Password cannot be blank.' };
+    }
+
+    try {
+      const apiRes = await loginUserApi(email, password);
+      if (apiRes?.token && apiRes?.user) {
+        return loginWithSession(apiRes.user, apiRes.token);
+      }
+      return { success: false, error: apiRes?.message || 'Login failed.' };
+    } catch (err) {
+      return { success: false, error: err.message || 'Invalid email or password.' };
+    }
   };
 
   const logout = () => {
@@ -792,22 +777,43 @@ export function AppProvider({ children }) {
     addToast('Broadcast Sent', 'Published to all assigned faculty dashboards.', 'success');
   };
 
-  // Universal Profile Update (Immutable Email)
-  const updateProfileInfo = (updatedProfileData) => {
-    if (!currentUser) return;
-    const updatedUser = {
-      ...currentUser,
-      ...updatedProfileData,
-      email: currentUser.email // IMMUTABLE
-    };
-    setCurrentUser(updatedUser);
-    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
-    addToast('Profile Updated', 'Your profile details have been saved.', 'success');
+  // Universal Profile Update (Persisted to DB)
+  const updateProfileInfo = async (updatedProfileData) => {
+    if (!currentUser) return { success: false, error: 'No user logged in' };
+    const nameToUpdate = updatedProfileData.name || `${updatedProfileData.firstName || ''} ${updatedProfileData.lastName || ''}`.trim() || currentUser.name;
+
+    try {
+      const res = await updateProfileApi(nameToUpdate);
+      const updatedUser = {
+        ...currentUser,
+        ...updatedProfileData,
+        name: res.user?.name || nameToUpdate,
+        email: currentUser.email // IMMUTABLE
+      };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('eduzenta_user', JSON.stringify(updatedUser));
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+      addToast('Profile Updated', 'Your profile details have been saved in the database.', 'success');
+      return { success: true, user: updatedUser };
+    } catch (err) {
+      console.error('[PROFILE PERSISTENCE ERROR]:', err);
+      addToast('Profile Update Error', err.message || 'Failed to update profile in database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
-  const resetPasswordSimple = (newPass) => {
-    addToast('Password Updated', 'Your password has been changed successfully.', 'success');
-    return true;
+  const resetPasswordSimple = async (newPass, currentPass = '') => {
+    if (!newPass) return { success: false, error: 'New password required.' };
+    try {
+      await updatePasswordApi(currentPass, newPass);
+      addToast('Password Updated', 'Your password has been changed successfully in the database.', 'success');
+      return { success: true };
+    } catch (err) {
+      console.error('[PASSWORD UPDATE ERROR]:', err);
+      addToast('Password Update Error', err.message || 'Failed to update password in database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   // Export newly added functions via provider value
