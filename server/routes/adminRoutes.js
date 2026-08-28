@@ -32,7 +32,17 @@ router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, r
   // Automatically attach requesting admin's school_id (or fallback if provided by super_admin)
   const userRole = String(req.user.role || '').toLowerCase();
   const isSuper = userRole === 'super_admin' || userRole === 'superadmin';
-  const targetSchoolId = isSuper ? (school_id || req.user.school_id || null) : req.user.school_id;
+  let targetSchoolId = isSuper ? (school_id || req.user.school_id || null) : (req.user.school_id || school_id || null);
+
+  // DB fallback lookup for creator's school_id if missing in token
+  if (!isSuper && !targetSchoolId && req.user.id) {
+    try {
+      const [creatorRows] = await pool.query('SELECT school_id FROM users WHERE id = ?', [req.user.id]);
+      if (creatorRows[0]?.school_id) {
+        targetSchoolId = creatorRows[0].school_id;
+      }
+    } catch (_) { /* fallback ignored */ }
+  }
 
   const cleanEmail = String(email).trim().toLowerCase();
   const targetAvatar = avatar || avatar_url || null;
@@ -53,12 +63,20 @@ router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, r
       [targetSchoolId, name.trim(), cleanEmail, hashedPassword, role, targetAvatar]
     );
 
+    // Fetch school name for immediate response
+    let schoolName = null;
+    if (targetSchoolId) {
+      const [sRows] = await pool.query('SELECT name FROM schools WHERE id = ?', [targetSchoolId]);
+      schoolName = sRows[0]?.name || null;
+    }
+
     return res.status(201).json({
       success: true,
       message: 'User account created successfully.',
       user: {
         id: result.insertId,
         school_id: targetSchoolId,
+        school_name: schoolName,
         name: name.trim(),
         email: cleanEmail,
         role,
@@ -81,19 +99,30 @@ router.post('/create-user', authenticateToken, requireSchoolAdmin, async (req, r
 // ------------------------------------------------------------
 router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => {
   try {
-    const schoolId = req.user.school_id;
+    let schoolId = req.user.school_id;
     const userRole = String(req.user.role || '').toLowerCase();
     const isSuper = userRole === 'super_admin' || userRole === 'superadmin';
 
-    let query = 'SELECT id, school_id, name, email, role, avatar_url, is_active, created_at FROM users';
+    if (!isSuper && !schoolId && req.user.id) {
+      const [uRows] = await pool.query('SELECT school_id FROM users WHERE id = ?', [req.user.id]);
+      if (uRows[0]?.school_id) {
+        schoolId = uRows[0].school_id;
+      }
+    }
+
+    let query = `
+      SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, u.created_at, s.name as school_name 
+      FROM users u 
+      LEFT JOIN schools s ON s.id = u.school_id
+    `;
     let params = [];
 
     if (!isSuper && schoolId) {
-      query += ' WHERE school_id = ?';
+      query += ' WHERE u.school_id = ? OR u.school_id IS NULL';
       params.push(schoolId);
     }
 
-    query += ' ORDER BY id DESC';
+    query += ' ORDER BY u.id DESC';
 
     const [users] = await pool.query(query, params);
     const formattedUsers = users.map(u => ({
@@ -106,6 +135,7 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
     return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
+
 
 // ------------------------------------------------------------
 // PUT /api/admin/users/:id — Update User / Admin Record by Database ID

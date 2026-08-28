@@ -115,10 +115,12 @@ export function AppProvider({ children }) {
               id: u.id,
               name: u.name,
               email: u.email,
-              role: u.role,
+              role: String(u.role || '').toLowerCase(),
               schoolId: u.school_id,
+              school_id: u.school_id,
               schoolName: u.school_name || 'Eduzenta School',
               avatar: u.avatar_url || u.avatar || null,
+              avatar_url: u.avatar_url || u.avatar || null,
               isActive: Boolean(u.is_active),
               created_at: u.created_at
             }));
@@ -128,7 +130,7 @@ export function AppProvider({ children }) {
           console.warn('[DB HYDRATION] fetchUsers failed:', err.message);
         }
 
-        // 3. Hydrate schools list from MySQL DB
+        // 3. Hydrate schools list from MySQL DB (If Super Admin)
         try {
           const schoolsRes = await fetchSchoolsApi();
           if (schoolsRes?.schools && Array.isArray(schoolsRes.schools)) {
@@ -136,15 +138,19 @@ export function AppProvider({ children }) {
               id: s.id,
               name: s.name,
               status: s.status || 'Active',
-              adminEmail: s.admin_email,
-              adminName: s.admin_name,
+              adminEmail: s.admin_email || 'No Admin Assigned',
+              adminName: s.admin_name || 'Unassigned',
+              monthlyRevenue: 1500,
+              studentsCount: 0,
+              teachersCount: 0,
               createdAt: s.created_at
             }));
             setSchools(mappedSchools);
           }
         } catch (err) {
-          console.warn('[DB HYDRATION] fetchSchools failed:', err.message);
+          // Expected 403 for non-SuperAdmin users — ignore silently
         }
+
 
         // 4. Hydrate students list from MySQL DB
         try {

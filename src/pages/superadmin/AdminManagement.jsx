@@ -17,11 +17,11 @@ export default function AdminManagement() {
     addToast
   } = useApp();
 
-  const [adminUsers, setAdminUsers] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   // Form Fields as per specs
   const [schoolName, setSchoolName] = useState('');
@@ -33,11 +33,13 @@ export default function AdminManagement() {
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('Knowledge City');
 
-  // Load and sync users state
-  useEffect(() => {
-    const list = users.filter(u => u.role === 'admin' || u.role === 'school_admin');
-    setAdminUsers(list);
+  // Derive admin list dynamically from live users state with normalized role check
+  const adminUsers = users.filter(u => {
+    const r = String(u.role || '').toLowerCase();
+    return r === 'admin' || r === 'school_admin' || r === 'school-admin';
+  });
 
+  useEffect(() => {
     // Async attempt to fetch fresh schools from remote backend
     fetchSchools()
       .then(res => {
@@ -46,7 +48,8 @@ export default function AdminManagement() {
         }
       })
       .catch(err => console.warn('Remote schools fetch skipped, using local store:', err.message));
-  }, [users]);
+  }, []);
+
 
   const resetForm = () => {
     setSchoolName('');
@@ -154,19 +157,21 @@ export default function AdminManagement() {
       label: 'School Branding',
       accessor: 'schoolName',
       render: (row) => {
-        const sch = schools.find(s => s.id === row.schoolId);
+        const sch = schools.find(s => String(s.id) === String(row.schoolId) || String(s.id) === String(row.school_id));
         const logo = sch?.logoUrl || row.schoolLogoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";
+        const displayName = sch?.name || row.schoolName || row.school_name || 'Eduzenta School';
         return (
           <div className="flex items-center gap-3">
-            <img src={logo} alt={row.schoolName} className="w-9 h-9 rounded-lg object-cover border border-slate-300 p-0.5 bg-white shrink-0 shadow-xs" />
+            <img src={logo} alt={displayName} className="w-9 h-9 rounded-lg object-cover border border-slate-300 p-0.5 bg-white shrink-0 shadow-xs" />
             <div>
-              <div className="font-extrabold text-slate-900">{row.schoolName}</div>
+              <div className="font-extrabold text-slate-900">{displayName}</div>
               <div className="text-[10px] text-[#5A3193] font-bold uppercase tracking-wider">Dynamic Logo Bound</div>
             </div>
           </div>
         );
       }
     },
+
     {
       label: 'Admin Account & Email',
       accessor: 'name',

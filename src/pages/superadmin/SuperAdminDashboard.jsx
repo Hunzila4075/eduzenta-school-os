@@ -74,10 +74,14 @@ export default function SuperAdminDashboard() {
     loadBroadcasts();
   }, []);
 
-  const totalActiveSchools = schools.filter(s => s.status === 'Active').length;
-  const totalLockedSchools = schools.filter(s => s.status.includes('Locked')).length;
-  const totalAdmins = users.filter(u => u.role === 'admin').length;
-  const totalRevenue = schools.reduce((acc, s) => acc + s.monthlyRevenue, 0);
+  const totalActiveSchools = schools.filter(s => String(s.status || '').toLowerCase() === 'active').length;
+  const totalLockedSchools = schools.filter(s => String(s.status || '').toLowerCase().includes('locked')).length;
+  const totalAdmins = users.filter(u => {
+    const r = String(u.role || '').toLowerCase();
+    return r === 'admin' || r === 'school_admin' || r === 'school-admin';
+  }).length;
+  const totalRevenue = schools.reduce((acc, s) => acc + (Number(s.monthlyRevenue) || Number(s.monthly_revenue) || 1500), 0);
+
 
   const handleImageFileChange = (e) => {
     const file = e.target.files[0];

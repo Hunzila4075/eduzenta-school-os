@@ -13,7 +13,8 @@ export default function TeacherManagement() {
     deleteTeacher
   } = useApp();
 
-  const teachers = users.filter(u => u.role === 'teacher');
+  const teachers = users.filter(u => String(u.role || '').toLowerCase() === 'teacher');
+
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
