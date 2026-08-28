@@ -202,6 +202,7 @@ export default function StudentDatabase() {
             <button
               onClick={() => handleDelete(row)}
               title="Delete Student Record (Admin Exclusive)"
+              aria-label={`Delete student ${row.name}`}
               className="p-1.5 rounded-lg border border-rose-200 bg-rose-600 text-white hover:bg-rose-700 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -274,12 +275,15 @@ export default function StudentDatabase() {
           title="Enrol New Student Profile"
         >
           <form onSubmit={handleAddSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Student Full Name</label>
+                <label htmlFor="add-student-name" className="block text-xs font-bold text-slate-700 mb-1">Student Full Name</label>
                 <input
+                  id="add-student-name"
+                  name="studentName"
                   type="text"
                   required
+                  autoComplete="name"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="e.g. Aiden Vance"
@@ -287,8 +291,10 @@ export default function StudentDatabase() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Class & Section</label>
+                <label htmlFor="add-student-class" className="block text-xs font-bold text-slate-700 mb-1">Class & Section</label>
                 <select
+                  id="add-student-class"
+                  name="classSection"
                   value={classSection}
                   onChange={e => setClassSection(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium"
@@ -300,12 +306,15 @@ export default function StudentDatabase() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Guardian Name</label>
+                <label htmlFor="add-student-guardian" className="block text-xs font-bold text-slate-700 mb-1">Guardian Name</label>
                 <input
+                  id="add-student-guardian"
+                  name="guardianName"
                   type="text"
                   required
+                  autoComplete="name"
                   value={guardianName}
                   onChange={e => setGuardianName(e.target.value)}
                   placeholder="e.g. David Vance"
@@ -313,9 +322,12 @@ export default function StudentDatabase() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
+                <label htmlFor="add-student-dob" className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
                 <input
+                  id="add-student-dob"
+                  name="dob"
                   type="date"
+                  autoComplete="bday"
                   value={dob}
                   onChange={e => setDob(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -323,10 +335,12 @@ export default function StudentDatabase() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Gender</label>
+                <label htmlFor="add-student-gender" className="block text-xs font-bold text-slate-700 mb-1">Gender</label>
                 <select
+                  id="add-student-gender"
+                  name="gender"
                   value={gender}
                   onChange={e => setGender(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
@@ -336,9 +350,12 @@ export default function StudentDatabase() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Phone</label>
+                <label htmlFor="add-student-phone" className="block text-xs font-bold text-slate-700 mb-1">Phone</label>
                 <input
+                  id="add-student-phone"
+                  name="phone"
                   type="text"
+                  autoComplete="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   placeholder="+1 (555) 234-5678"
@@ -348,9 +365,12 @@ export default function StudentDatabase() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Residential Address</label>
+              <label htmlFor="add-student-address" className="block text-xs font-bold text-slate-700 mb-1">Residential Address</label>
               <input
+                id="add-student-address"
+                name="address"
                 type="text"
+                autoComplete="street-address"
                 value={address}
                 onChange={e => setAddress(e.target.value)}
                 placeholder="742 Evergreen Terrace, Knowledge City"
@@ -385,20 +405,25 @@ export default function StudentDatabase() {
           title="Update Student Profile"
         >
           <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Student Name</label>
+                <label htmlFor="edit-student-name" className="block text-xs font-bold text-slate-700 mb-1">Student Name</label>
                 <input
+                  id="edit-student-name"
+                  name="studentName"
                   type="text"
                   required
+                  autoComplete="name"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Class & Section</label>
+                <label htmlFor="edit-student-class" className="block text-xs font-bold text-slate-700 mb-1">Class & Section</label>
                 <select
+                  id="edit-student-class"
+                  name="classSection"
                   value={classSection}
                   onChange={e => setClassSection(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium"
@@ -410,21 +435,27 @@ export default function StudentDatabase() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Guardian Name</label>
+                <label htmlFor="edit-student-guardian" className="block text-xs font-bold text-slate-700 mb-1">Guardian Name</label>
                 <input
+                  id="edit-student-guardian"
+                  name="guardianName"
                   type="text"
                   required
+                  autoComplete="name"
                   value={guardianName}
                   onChange={e => setGuardianName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Phone</label>
+                <label htmlFor="edit-student-phone" className="block text-xs font-bold text-slate-700 mb-1">Phone</label>
                 <input
+                  id="edit-student-phone"
+                  name="phone"
                   type="text"
+                  autoComplete="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"

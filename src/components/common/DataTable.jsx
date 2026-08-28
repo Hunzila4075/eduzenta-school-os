@@ -88,32 +88,38 @@ export default function DataTable({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden w-full max-w-full">
       {/* Header & Control Bar */}
-      <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-50/40">
+      <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-slate-50/40">
         <div>
-          {title && <h3 className="text-lg font-black text-slate-900 tracking-tight">{title}</h3>}
+          {title && <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">{title}</h3>}
           {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 w-full md:w-auto">
           {/* Search Bar */}
           <div className="relative flex-1 min-w-[200px] md:min-w-[240px]">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
+              id="datatable-search"
+              name="searchTerm"
               type="text"
               value={searchTerm}
               onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               placeholder={searchPlaceholder}
-              className="w-full pl-9 pr-3 py-2 text-base md:text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
+              aria-label={searchPlaceholder}
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
             />
           </div>
 
           {/* Filter Dropdown */}
           {filterOptions.length > 0 && (
             <select
+              id="datatable-filter"
+              name="selectedFilter"
               value={selectedFilter}
               onChange={e => { setSelectedFilter(e.target.value); setCurrentPage(1); }}
+              aria-label="Filter category"
               className="py-2 px-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-700 font-medium"
             >
               <option value="ALL">All Categories</option>
@@ -124,11 +130,12 @@ export default function DataTable({
           )}
 
           {/* Export Buttons */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={exportCSV}
               title="Export as CSV"
-              className="flex items-center gap-1 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-colors"
+              aria-label="Export table data as CSV"
+              className="flex items-center gap-1 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-colors min-h-[38px]"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span>CSV</span>
@@ -138,7 +145,8 @@ export default function DataTable({
               <button
                 onClick={onPdfExport}
                 title="Export as PDF"
-                className="flex items-center gap-1 py-2 px-3 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold shadow-xs transition-colors"
+                aria-label="Export table data as Bulk PDF"
+                className="flex items-center gap-1 py-2 px-3 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold shadow-xs transition-colors min-h-[38px]"
               >
                 <FileText className="w-3.5 h-3.5 text-blue-600" />
                 <span>Bulk PDF</span>
@@ -151,8 +159,8 @@ export default function DataTable({
         </div>
       </div>
 
-      {/* Table Body */}
-      <div className="w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      {/* Table Body Container with overflow scroll */}
+      <div className="w-full overflow-x-auto -webkit-overflow-scrolling-touch">
         <table className="w-full text-left border-collapse min-w-[650px]">
           <thead>
             <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 select-none">
@@ -193,7 +201,7 @@ export default function DataTable({
       </div>
 
       {/* Pagination Footer */}
-      <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/30">
+      <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 bg-slate-50/30">
         <div>
           Showing <span className="font-bold text-slate-800">{paginatedData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> to{' '}
           <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, sortedData.length)}</span> of{' '}
@@ -204,17 +212,19 @@ export default function DataTable({
           <button
             disabled={currentPage === 1}
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Previous page"
+            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="font-bold text-slate-700">
+          <span className="font-bold text-slate-700 px-2">
             {currentPage} / {totalPages}
           </span>
           <button
             disabled={currentPage >= totalPages}
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Next page"
+            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
           >
             <ChevronRight className="w-4 h-4" />
           </button>

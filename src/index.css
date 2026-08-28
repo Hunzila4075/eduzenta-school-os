@@ -12,6 +12,12 @@
     --qobe-green: #16a34a;
   }
 
+  html, body, #root, .app-container {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+
   body {
     background-color: var(--bg-main);
     color: #1e293b;
