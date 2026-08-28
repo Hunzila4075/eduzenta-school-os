@@ -207,13 +207,16 @@ export default function AdminManagement() {
           onClose={() => setIsAddModalOpen(false)}
           title="Onboard New School Admin & Set Dynamic Branding"
         >
-          <form onSubmit={handleCreateSubmit} className="space-y-4">
+          <form onSubmit={handleCreateSubmit} className="space-y-4" autoComplete="off">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">School Name <span className="text-rose-600">*</span></label>
+                <label htmlFor="admin-school-name" className="block text-xs font-bold text-slate-700 mb-1">School Name <span className="text-rose-600">*</span></label>
                 <input
+                  id="admin-school-name"
+                  name="schoolName"
                   type="text"
                   required
+                  autoComplete="organization"
                   value={schoolName}
                   onChange={e => setSchoolName(e.target.value)}
                   placeholder="e.g. ST. JUDE ACADEMY"
@@ -222,9 +225,12 @@ export default function AdminManagement() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">City / Location</label>
+                <label htmlFor="admin-school-city" className="block text-xs font-bold text-slate-700 mb-1">City / Location</label>
                 <input
+                  id="admin-school-city"
+                  name="city"
                   type="text"
+                  autoComplete="address-level2"
                   value={city}
                   onChange={e => setCity(e.target.value)}
                   placeholder="Knowledge City"
@@ -235,7 +241,7 @@ export default function AdminManagement() {
 
             {/* DIRECT LOCAL FILE PICKER FOR SCHOOL LOGO */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label htmlFor="admin-school-logo" className="block text-xs font-bold text-slate-700 mb-1">
                 Upload School Logo Image (Local File Picker Only) <span className="text-rose-600">*</span>
               </label>
               <div className="flex items-center gap-3 border border-slate-300 p-3 rounded-xl bg-slate-50">
@@ -246,6 +252,8 @@ export default function AdminManagement() {
                 />
                 <div className="flex-1">
                   <input
+                    id="admin-school-logo"
+                    name="schoolLogo"
                     type="file"
                     accept="image/*"
                     onChange={handleLogoFileChange}
@@ -260,10 +268,13 @@ export default function AdminManagement() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Admin First Name <span className="text-rose-600">*</span></label>
+                <label htmlFor="admin-first-name" className="block text-xs font-bold text-slate-700 mb-1">Admin First Name <span className="text-rose-600">*</span></label>
                 <input
+                  id="admin-first-name"
+                  name="adminFirstName"
                   type="text"
                   required
+                  autoComplete="given-name"
                   value={firstName}
                   onChange={e => setFirstName(e.target.value)}
                   placeholder="Dr. Eleanor"
@@ -272,10 +283,13 @@ export default function AdminManagement() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Admin Last Name <span className="text-rose-600">*</span></label>
+                <label htmlFor="admin-last-name" className="block text-xs font-bold text-slate-700 mb-1">Admin Last Name <span className="text-rose-600">*</span></label>
                 <input
+                  id="admin-last-name"
+                  name="adminLastName"
                   type="text"
                   required
+                  autoComplete="family-name"
                   value={lastName}
                   onChange={e => setLastName(e.target.value)}
                   placeholder="Vance"
@@ -286,10 +300,13 @@ export default function AdminManagement() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Email <span className="text-rose-600">*</span></label>
+                <label htmlFor="admin-email" className="block text-xs font-bold text-slate-700 mb-1">Assigned Email <span className="text-rose-600">*</span></label>
                 <input
+                  id="admin-email"
+                  name="adminEmail"
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="admin@stjude.edu"
@@ -298,9 +315,12 @@ export default function AdminManagement() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+                <label htmlFor="admin-phone" className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
                 <input
+                  id="admin-phone"
+                  name="adminPhone"
                   type="text"
+                  autoComplete="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   placeholder="+1 (555) 000-1122"
@@ -310,9 +330,12 @@ export default function AdminManagement() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Initial Password</label>
+              <label htmlFor="admin-password" className="block text-xs font-bold text-slate-700 mb-1">Initial Password</label>
               <input
+                id="admin-password"
+                name="adminPassword"
                 type="text"
+                autoComplete="new-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Default: school123"
@@ -332,7 +355,7 @@ export default function AdminManagement() {
                 type="submit"
                 className="px-4 py-2 rounded-xl qobe-btn-primary text-xs font-bold shadow-sm"
               >
-                Onboard School & Bind Logo
+                Onboard School &amp; Bind Logo
               </button>
             </div>
           </form>
@@ -344,12 +367,15 @@ export default function AdminManagement() {
           onClose={() => setIsEditModalOpen(false)}
           title="Update School Branding & Admin"
         >
-          <form onSubmit={handleEditSubmit} className="space-y-4">
+          <form onSubmit={handleEditSubmit} className="space-y-4" autoComplete="off">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">School Name</label>
+              <label htmlFor="edit-school-name" className="block text-xs font-bold text-slate-700 mb-1">School Name</label>
               <input
+                id="edit-school-name"
+                name="schoolName"
                 type="text"
                 required
+                autoComplete="organization"
                 value={schoolName}
                 onChange={e => setSchoolName(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
@@ -357,7 +383,7 @@ export default function AdminManagement() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Upload New School Logo (Local File)</label>
+              <label htmlFor="edit-school-logo" className="block text-xs font-bold text-slate-700 mb-1">Upload New School Logo (Local File)</label>
               <div className="flex items-center gap-3 border border-slate-300 p-2.5 rounded-xl bg-slate-50">
                 <img
                   src={schoolLogoUrl}
@@ -365,6 +391,8 @@ export default function AdminManagement() {
                   className="w-10 h-10 rounded-lg object-cover border border-purple-400 p-0.5 bg-white shrink-0"
                 />
                 <input
+                  id="edit-school-logo"
+                  name="schoolLogo"
                   type="file"
                   accept="image/*"
                   onChange={handleLogoFileChange}
@@ -375,20 +403,26 @@ export default function AdminManagement() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">First Name</label>
+                <label htmlFor="edit-admin-first-name" className="block text-xs font-bold text-slate-700 mb-1">First Name</label>
                 <input
+                  id="edit-admin-first-name"
+                  name="firstName"
                   type="text"
                   required
+                  autoComplete="given-name"
                   value={firstName}
                   onChange={e => setFirstName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Last Name</label>
+                <label htmlFor="edit-admin-last-name" className="block text-xs font-bold text-slate-700 mb-1">Last Name</label>
                 <input
+                  id="edit-admin-last-name"
+                  name="lastName"
                   type="text"
                   required
+                  autoComplete="family-name"
                   value={lastName}
                   onChange={e => setLastName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
@@ -397,10 +431,13 @@ export default function AdminManagement() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Email (Immutable)</label>
+              <label htmlFor="edit-admin-email" className="block text-xs font-bold text-slate-700 mb-1">Assigned Email (Immutable)</label>
               <input
+                id="edit-admin-email"
+                name="email"
                 type="text"
                 disabled
+                autoComplete="email"
                 value={email}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-100 font-mono text-slate-500"
               />
@@ -418,7 +455,7 @@ export default function AdminManagement() {
                 type="submit"
                 className="px-4 py-2 rounded-xl qobe-btn-primary text-xs font-bold"
               >
-                Save Branding & Info
+                Save Branding &amp; Info
               </button>
             </div>
           </form>

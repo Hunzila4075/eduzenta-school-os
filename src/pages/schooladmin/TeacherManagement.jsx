@@ -164,12 +164,15 @@ export default function TeacherManagement() {
           onClose={() => setIsAddModalOpen(false)}
           title="Create New Teacher Account"
         >
-          <form onSubmit={handleAddSubmit} className="space-y-4">
+          <form onSubmit={handleAddSubmit} className="space-y-4" autoComplete="off">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Teacher Full Name</label>
+              <label htmlFor="teacher-name" className="block text-xs font-bold text-slate-700 mb-1">Teacher Full Name</label>
               <input
+                id="teacher-name"
+                name="teacherName"
                 type="text"
                 required
+                autoComplete="name"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="e.g. Prof. Marcus Thorne"
@@ -177,10 +180,13 @@ export default function TeacherManagement() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Email</label>
+              <label htmlFor="teacher-email" className="block text-xs font-bold text-slate-700 mb-1">Assigned Email</label>
               <input
+                id="teacher-email"
+                name="teacherEmail"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="e.g. teacher@excellence.edu"
@@ -188,9 +194,12 @@ export default function TeacherManagement() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Initial Password</label>
+              <label htmlFor="teacher-password" className="block text-xs font-bold text-slate-700 mb-1">Initial Password</label>
               <input
+                id="teacher-password"
+                name="teacherPassword"
                 type="text"
+                autoComplete="new-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Default: teacher123"
@@ -198,9 +207,12 @@ export default function TeacherManagement() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Classes (Comma separated)</label>
+              <label htmlFor="teacher-classes" className="block text-xs font-bold text-slate-700 mb-1">Assigned Classes (Comma separated)</label>
               <input
+                id="teacher-classes"
+                name="assignedClasses"
                 type="text"
+                autoComplete="off"
                 value={assignedClasses}
                 onChange={e => setAssignedClasses(e.target.value)}
                 placeholder="e.g. Class 10-A, Class 9-B"
@@ -208,9 +220,12 @@ export default function TeacherManagement() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Subjects (Comma separated)</label>
+              <label htmlFor="teacher-subjects" className="block text-xs font-bold text-slate-700 mb-1">Assigned Subjects (Comma separated)</label>
               <input
+                id="teacher-subjects"
+                name="assignedSubjects"
                 type="text"
+                autoComplete="off"
                 value={assignedSubjects}
                 onChange={e => setAssignedSubjects(e.target.value)}
                 placeholder="e.g. Physics, Mathematics"
@@ -241,40 +256,52 @@ export default function TeacherManagement() {
           onClose={() => setIsEditModalOpen(false)}
           title="Update Faculty Details"
         >
-          <form onSubmit={handleEditSubmit} className="space-y-4">
+          <form onSubmit={handleEditSubmit} className="space-y-4" autoComplete="off">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+              <label htmlFor="edit-teacher-name" className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
               <input
+                id="edit-teacher-name"
+                name="teacherName"
                 type="text"
                 required
+                autoComplete="name"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Email</label>
+              <label htmlFor="edit-teacher-email" className="block text-xs font-bold text-slate-700 mb-1">Email</label>
               <input
+                id="edit-teacher-email"
+                name="teacherEmail"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Classes</label>
+              <label htmlFor="edit-teacher-classes" className="block text-xs font-bold text-slate-700 mb-1">Assigned Classes</label>
               <input
+                id="edit-teacher-classes"
+                name="assignedClasses"
                 type="text"
+                autoComplete="off"
                 value={assignedClasses}
                 onChange={e => setAssignedClasses(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Subjects</label>
+              <label htmlFor="edit-teacher-subjects" className="block text-xs font-bold text-slate-700 mb-1">Assigned Subjects</label>
               <input
+                id="edit-teacher-subjects"
+                name="assignedSubjects"
                 type="text"
+                autoComplete="off"
                 value={assignedSubjects}
                 onChange={e => setAssignedSubjects(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"

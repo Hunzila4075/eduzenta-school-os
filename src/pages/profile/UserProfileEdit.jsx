@@ -76,6 +76,8 @@ export default function UserProfileEdit() {
                 </label>
                 <div className="flex flex-col gap-1.5">
                   <input
+                    id="profile-avatar"
+                    name="avatar"
                     type="file"
                     accept="image/*"
                     onChange={handleAvatarFileChange}
@@ -91,10 +93,13 @@ export default function UserProfileEdit() {
             {/* Name Fields */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">First Name <span className="text-rose-600">*</span></label>
+                <label htmlFor="profile-first-name" className="block text-xs font-bold text-slate-700 mb-1">First Name <span className="text-rose-600">*</span></label>
                 <input
+                  id="profile-first-name"
+                  name="firstName"
                   type="text"
                   required
+                  autoComplete="given-name"
                   value={firstName}
                   onChange={e => setFirstName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500"
@@ -102,9 +107,12 @@ export default function UserProfileEdit() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Middle Name</label>
+                <label htmlFor="profile-middle-name" className="block text-xs font-bold text-slate-700 mb-1">Middle Name</label>
                 <input
+                  id="profile-middle-name"
+                  name="middleName"
                   type="text"
+                  autoComplete="additional-name"
                   value={middleName}
                   onChange={e => setMiddleName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500"
@@ -112,10 +120,13 @@ export default function UserProfileEdit() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Last Name <span className="text-rose-600">*</span></label>
+                <label htmlFor="profile-last-name" className="block text-xs font-bold text-slate-700 mb-1">Last Name <span className="text-rose-600">*</span></label>
                 <input
+                  id="profile-last-name"
+                  name="lastName"
                   type="text"
                   required
+                  autoComplete="family-name"
                   value={lastName}
                   onChange={e => setLastName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500"
@@ -137,23 +148,29 @@ export default function UserProfileEdit() {
             {/* Email & Phone */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
+                <label htmlFor="profile-email" className="block text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
                   <span>Assigned Email Address</span>
                   <Lock className="w-3 h-3 text-slate-400" />
                 </label>
                 <input
+                  id="profile-email"
+                  name="email"
                   type="text"
                   disabled
                   readOnly
+                  autoComplete="email"
                   value={currentUser?.email || ''}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-100 text-slate-500 font-mono cursor-not-allowed select-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Phone / Mobile Number</label>
+                <label htmlFor="profile-phone" className="block text-xs font-bold text-slate-700 mb-1">Phone / Mobile Number</label>
                 <input
+                  id="profile-phone"
+                  name="phone"
                   type="text"
+                  autoComplete="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono focus:ring-2 focus:ring-purple-500"
@@ -164,9 +181,12 @@ export default function UserProfileEdit() {
             {/* DOB & Designation */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
+                <label htmlFor="profile-dob" className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
                 <input
+                  id="profile-dob"
+                  name="dob"
                   type="date"
+                  autoComplete="bday"
                   value={dob}
                   onChange={e => setDob(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500"
@@ -174,9 +194,12 @@ export default function UserProfileEdit() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Designation</label>
+                <label htmlFor="profile-designation" className="block text-xs font-bold text-slate-700 mb-1">Designation</label>
                 <input
+                  id="profile-designation"
+                  name="designation"
                   type="text"
+                  autoComplete="organization-title"
                   value={designation}
                   onChange={e => setDesignation(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500"
@@ -187,9 +210,12 @@ export default function UserProfileEdit() {
             {/* Social Links */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">LinkedIn Profile</label>
+                <label htmlFor="profile-linkedin" className="block text-xs font-bold text-slate-700 mb-1">LinkedIn Profile</label>
                 <input
-                  type="text"
+                  id="profile-linkedin"
+                  name="linkedin"
+                  type="url"
+                  autoComplete="url"
                   value={linkedin}
                   onChange={e => setLinkedin(e.target.value)}
                   placeholder="https://linkedin.com/in/..."
@@ -198,9 +224,12 @@ export default function UserProfileEdit() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Twitter / X Profile</label>
+                <label htmlFor="profile-twitter" className="block text-xs font-bold text-slate-700 mb-1">Twitter / X Profile</label>
                 <input
-                  type="text"
+                  id="profile-twitter"
+                  name="twitter"
+                  type="url"
+                  autoComplete="url"
                   value={twitter}
                   onChange={e => setTwitter(e.target.value)}
                   placeholder="https://twitter.com/..."

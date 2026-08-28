@@ -79,16 +79,22 @@ export default function UnifiedLoginPage() {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
           {/* User Name / Email Input with red border when empty */}
           <div>
-            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 mb-1">
+            <label
+              htmlFor="login-email"
+              className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 mb-1"
+            >
               User Name / Email <span className="text-rose-600">*</span>
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
+                id="login-email"
+                name="email"
                 type="text"
+                autoComplete="username"
                 value={email}
                 onChange={e => { setEmail(e.target.value); setEmailHasError(false); setInlineError(''); }}
                 placeholder="Enter your assigned email / username"
@@ -101,13 +107,19 @@ export default function UnifiedLoginPage() {
 
           {/* Password Input */}
           <div>
-            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 mb-1">
+            <label
+              htmlFor="login-password"
+              className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 mb-1"
+            >
               Password <span className="text-rose-600">*</span>
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
+                id="login-password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••••••"
@@ -116,6 +128,7 @@ export default function UnifiedLoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -125,8 +138,10 @@ export default function UnifiedLoginPage() {
 
           {/* Remember Me */}
           <div className="flex items-center justify-between text-xs py-1">
-            <label className="flex items-center gap-2 cursor-pointer text-slate-700 select-none">
+            <label htmlFor="login-remember" className="flex items-center gap-2 cursor-pointer text-slate-700 select-none">
               <input
+                id="login-remember"
+                name="remember"
                 type="checkbox"
                 checked={rememberMe}
                 onChange={e => setRememberMe(e.target.checked)}
