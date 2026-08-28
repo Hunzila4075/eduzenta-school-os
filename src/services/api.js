@@ -25,14 +25,22 @@ async function request(endpoint, options = {}) {
     const response = await fetch(url, config);
     
     // Explicit error handling for 401 Unauthorized / 403 Forbidden - Auto Purge
-    if (response.status === 401 || response.status === 403) {
-      console.warn('[API SERVICE WARNING] Session token expired or unauthorized. Purging local credentials.');
+    // NOTE: Skip purge for auth routes (login/register) to avoid redirect loops on bad credentials
+    const isAuthRoute = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
+    if (!isAuthRoute && (response.status === 401 || response.status === 403)) {
+      console.warn('[API SERVICE WARNING] Session token expired or unauthorized. Purging local credentials and redirecting to login.');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('eduzenta_token');
       localStorage.removeItem('eduzenta_user');
       const data = await response.json().catch(() => ({}));
       throw new Error(data.message || data.error || 'Session expired or unauthorized. Please log in again.');
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      // Auth route returned 401/403 — wrong credentials, just throw without purging
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || data.error || 'Invalid credentials. Please try again.');
     }
 
     // Explicit error handling for 504 Gateway / Database Timeout
