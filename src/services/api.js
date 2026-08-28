@@ -24,15 +24,14 @@ async function request(endpoint, options = {}) {
   try {
     const response = await fetch(url, config);
     
-    // Explicit error handling for 401 Unauthorized / Token Expired
-    if (response.status === 401) {
+    // Explicit error handling for 401 Unauthorized / 403 Forbidden - Auto Purge
+    if (response.status === 401 || response.status === 403) {
+      console.warn('[API SERVICE WARNING] Session token expired or unauthorized. Purging local credentials.');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('eduzenta_token');
+      localStorage.removeItem('eduzenta_user');
       const data = await response.json().catch(() => ({}));
-      if (data.error === 'TokenExpired' || data.message?.includes('expired') || data.message?.includes('jwt')) {
-        console.warn('[API SERVICE WARNING] Session token expired or invalid. Clearing local auth.');
-        localStorage.removeItem('token');
-        localStorage.removeItem('eduzenta_token');
-        localStorage.removeItem('eduzenta_user');
-      }
       throw new Error(data.message || data.error || 'Session expired or unauthorized. Please log in again.');
     }
 
@@ -74,6 +73,7 @@ export async function loginUser(email, password) {
     localStorage.setItem('token', data.token);
     localStorage.setItem('eduzenta_token', data.token);
     if (data.user) {
+      localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('eduzenta_user', JSON.stringify(data.user));
     }
   }
