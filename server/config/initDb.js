@@ -102,6 +102,7 @@ export async function initializeDatabase() {
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
           \`title\` VARCHAR(255) NOT NULL,
           \`description\` TEXT NOT NULL,
+          \`message\` TEXT DEFAULT NULL,
           \`image_url\` TEXT DEFAULT NULL,
           \`video_url\` TEXT DEFAULT NULL,
           \`target_school_id\` VARCHAR(50) DEFAULT 'all',
@@ -111,6 +112,15 @@ export async function initializeDatabase() {
           INDEX \`idx_created_at\` (\`created_at\`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
+
+      // Ensure message column exists if table existed previously without it
+      try {
+        await connection.query(`
+          ALTER TABLE \`broadcasts\` ADD COLUMN \`message\` TEXT DEFAULT NULL AFTER \`description\`;
+        `);
+      } catch (err) {
+        // Column already exists, ignore
+      }
 
       // 7. INITIAL SUPER ADMIN SEEDING (INSERT IGNORE TO PRESERVE PROFILE UPDATES ON RESTART)
       const superAdminEmail = 'developerwithkhan804@gmail.com';

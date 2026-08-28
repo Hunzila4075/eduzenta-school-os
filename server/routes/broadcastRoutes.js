@@ -9,6 +9,7 @@ const mockBroadcasts = [
     id: 'note_01',
     title: 'Q3 System Policy & Mandatory Audit',
     description: 'All School Administrators must verify student fee chalans, sync final marks, and ensure attendance records are locked before the term deadline.',
+    message: 'All School Administrators must verify student fee chalans, sync final marks, and ensure attendance records are locked before the term deadline.',
     imageUrl: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=800&q=80',
     videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
     targetSchoolId: 'all',
@@ -33,7 +34,8 @@ router.get('/', async (req, res) => {
     const formatted = rows.map(r => ({
       id: r.id,
       title: r.title,
-      description: r.description,
+      description: r.description || r.message || '',
+      message: r.message || r.description || '',
       imageUrl: r.image_url,
       videoUrl: r.video_url,
       targetSchoolId: r.target_school_id,
@@ -54,51 +56,61 @@ router.get('/', async (req, res) => {
 
 // POST /api/broadcasts — Publish a new directive / broadcast note
 router.post('/', async (req, res) => {
-  const { title, description, imageUrl, videoUrl, targetSchoolId, sender } = req.body;
-  if (!title || !description) {
-    return res.status(400).json({ success: false, error: 'Title and Description are required.' });
-  }
-
   try {
-    const sql = `
-      INSERT INTO broadcasts (title, description, image_url, video_url, target_school_id, sender)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `;
-    const [result] = await pool.query(sql, [
-      title,
-      description,
-      imageUrl || null,
-      videoUrl || null,
-      targetSchoolId || 'all',
-      sender || 'Super Admin'
-    ]);
+    const { title, description, message, imageUrl, videoUrl, targetSchoolId, sender } = req.body;
+    const bodyContent = description || message;
 
-    const newBroadcast = {
-      id: result.insertId,
-      title,
-      description,
-      imageUrl,
-      videoUrl,
-      targetSchoolId: targetSchoolId || 'all',
-      sender: sender || 'Super Admin',
-      createdAt: new Date().toISOString()
-    };
+    if (!title || !bodyContent) {
+      return res.status(400).json({ success: false, error: 'Title and Description/Message are required.' });
+    }
 
-    return res.status(201).json({ success: true, message: 'Broadcast directive published successfully.', data: newBroadcast });
+    try {
+      const sql = `
+        INSERT INTO broadcasts (title, description, message, image_url, video_url, target_school_id, sender)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+      const [result] = await pool.query(sql, [
+        title,
+        bodyContent,
+        bodyContent,
+        imageUrl || null,
+        videoUrl || null,
+        targetSchoolId || 'all',
+        sender || 'Super Admin'
+      ]);
+
+      const newBroadcast = {
+        id: result.insertId,
+        title,
+        description: bodyContent,
+        message: bodyContent,
+        imageUrl,
+        videoUrl,
+        targetSchoolId: targetSchoolId || 'all',
+        sender: sender || 'Super Admin',
+        createdAt: new Date().toISOString()
+      };
+
+      return res.status(201).json({ success: true, message: 'Broadcast directive published successfully.', data: newBroadcast });
+    } catch (dbErr) {
+      console.warn('[BROADCASTS API] Database insert failed, publishing locally:', dbErr.message);
+      const newBroadcast = {
+        id: `note_${Date.now()}`,
+        title,
+        description: bodyContent,
+        message: bodyContent,
+        imageUrl,
+        videoUrl,
+        targetSchoolId: targetSchoolId || 'all',
+        sender: sender || 'Super Admin',
+        createdAt: new Date().toISOString()
+      };
+      mockBroadcasts.unshift(newBroadcast);
+      return res.status(201).json({ success: true, isMock: true, message: 'Broadcast directive published locally.', data: newBroadcast });
+    }
   } catch (error) {
-    console.warn('[BROADCASTS API] Database insert failed, publishing locally:', error.message);
-    const newBroadcast = {
-      id: `note_${Date.now()}`,
-      title,
-      description,
-      imageUrl,
-      videoUrl,
-      targetSchoolId: targetSchoolId || 'all',
-      sender: sender || 'Super Admin',
-      createdAt: new Date().toISOString()
-    };
-    mockBroadcasts.unshift(newBroadcast);
-    return res.status(201).json({ success: true, isMock: true, message: 'Broadcast directive published locally.', data: newBroadcast });
+    console.error('[BROADCASTS API FATAL]:', error);
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
 
