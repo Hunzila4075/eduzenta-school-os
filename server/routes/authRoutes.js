@@ -99,6 +99,47 @@ router.post('/login', async (req, res) => {
 });
 
 // ------------------------------------------------------------
+// GET /api/auth/me — Re-hydrate Live Authenticated User Profile from Database
+// ------------------------------------------------------------
+router.get('/me', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, school_id, name, email, role, is_active, created_at, updated_at FROM users WHERE id = ?',
+      [userId]
+    );
+    const user = rows[0];
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'User account not found.'
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        error: 'Account Locked',
+        message: 'This account has been deactivated.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      user
+    });
+  } catch (error) {
+    console.error('[GET AUTH ME ERROR]:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+// ------------------------------------------------------------
 // PUT /api/auth/profile — Persistent Profile Update
 // ------------------------------------------------------------
 router.put('/profile', authenticateToken, async (req, res) => {

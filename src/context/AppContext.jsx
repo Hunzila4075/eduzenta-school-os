@@ -10,6 +10,11 @@ import {
 } from '../utils/initialData';
 import {
   loginUser as loginUserApi,
+  fetchMe as fetchMeApi,
+  fetchUsers as fetchUsersApi,
+  fetchSchools as fetchSchoolsApi,
+  updateUser as updateUserApi,
+  deleteUser as deleteUserApi,
   updateProfile as updateProfileApi,
   updatePassword as updatePasswordApi
 } from '../services/api';
@@ -29,8 +34,67 @@ export function AppProvider({ children }) {
   const [chalans, setChalans] = useState(MOCK_CHALANS);
   const [attendance, setAttendance] = useState([]);
   const [attendanceOverrides, setAttendanceOverrides] = useState([]);
-  // New Activities state for marks entry workflow
   const [activities, setActivities] = useState([]);
+
+  // Database Re-Hydration on Mount / Refresh
+  React.useEffect(() => {
+    async function loadDatabaseState() {
+      const savedToken = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
+      if (savedToken) {
+        // 1. Re-hydrate live user profile from MySQL
+        try {
+          const meRes = await fetchMeApi();
+          if (meRes?.user) {
+            setCurrentUser(prev => ({ ...(prev || {}), ...meRes.user }));
+            localStorage.setItem('user', JSON.stringify(meRes.user));
+            localStorage.setItem('eduzenta_user', JSON.stringify(meRes.user));
+          }
+        } catch (err) {
+          console.warn('[DB HYDRATION] fetchMe failed:', err.message);
+        }
+
+        // 2. Hydrate users list from MySQL DB
+        try {
+          const usersRes = await fetchUsersApi();
+          if (usersRes?.users && Array.isArray(usersRes.users)) {
+            const mappedUsers = usersRes.users.map(u => ({
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              role: u.role,
+              schoolId: u.school_id,
+              schoolName: u.school_name || 'Eduzenta School',
+              isActive: Boolean(u.is_active),
+              created_at: u.created_at
+            }));
+            setUsers(mappedUsers);
+          }
+        } catch (err) {
+          console.warn('[DB HYDRATION] fetchUsers failed:', err.message);
+        }
+
+        // 3. Hydrate schools list from MySQL DB
+        try {
+          const schoolsRes = await fetchSchoolsApi();
+          if (schoolsRes?.schools && Array.isArray(schoolsRes.schools)) {
+            const mappedSchools = schoolsRes.schools.map(s => ({
+              id: s.id,
+              name: s.name,
+              status: s.status || 'Active',
+              adminEmail: s.admin_email,
+              adminName: s.admin_name,
+              createdAt: s.created_at
+            }));
+            setSchools(mappedSchools);
+          }
+        } catch (err) {
+          console.warn('[DB HYDRATION] fetchSchools failed:', err.message);
+        }
+      }
+    }
+
+    loadDatabaseState();
+  }, []);
 
   // Communication & Broadcast Notes State (Super Admin -> School Admins)
   const [broadcastNotes, setBroadcastNotes] = useState(() => {
@@ -571,18 +635,52 @@ export function AppProvider({ children }) {
     addToast('School Admin Onboarded', `Logo & Branding bound to ${data.schoolName}.`, 'success');
   };
 
-  const updateSchoolAdmin = (userId, updatedFields) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updatedFields, email: u.email } : u));
-    addToast('Account Updated', 'School Admin profile updated.', 'success');
+  const updateSchoolAdmin = async (userId, updatedFields) => {
+    const numericId = parseInt(String(userId).replace(/\D/g, ''));
+    const cleanName = updatedFields.name || `${updatedFields.firstName || ''} ${updatedFields.lastName || ''}`.trim();
+
+    try {
+      if (!isNaN(numericId) && numericId > 0) {
+        const res = await updateUserApi(numericId, {
+          name: cleanName,
+          school_name: updatedFields.schoolName
+        });
+        if (res?.user) {
+          setUsers(prev => prev.map(u => (u.id === userId || u.id === numericId) ? { ...u, ...updatedFields, name: res.user.name } : u));
+          if (res.user.school_name) {
+            setSchools(prev => prev.map(s => (s.id === res.user.school_id) ? { ...s, name: res.user.school_name } : s));
+          }
+        }
+      } else {
+        setUsers(prev => prev.map(u => (u.id === userId) ? { ...u, ...updatedFields, email: u.email } : u));
+      }
+      addToast('Account Updated', 'School Admin profile updated in database.', 'success');
+      return { success: true };
+    } catch (err) {
+      console.error('[UPDATE SCHOOL ADMIN ERROR]:', err);
+      addToast('Update Failed', err.message || 'Failed to update admin in database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
-  const deleteSchoolAdmin = (userId) => {
-    const userToDelete = users.find(u => u.id === userId);
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    if (userToDelete?.schoolId) {
-      setSchools(prev => prev.filter(s => s.id !== userToDelete.schoolId));
+  const deleteSchoolAdmin = async (userId) => {
+    const numericId = parseInt(String(userId).replace(/\D/g, ''));
+    try {
+      if (!isNaN(numericId) && numericId > 0) {
+        await deleteUserApi(numericId);
+      }
+      const userToDelete = users.find(u => u.id === userId || u.id === numericId);
+      setUsers(prev => prev.filter(u => u.id !== userId && u.id !== numericId));
+      if (userToDelete?.schoolId) {
+        setSchools(prev => prev.filter(s => s.id !== userToDelete.schoolId));
+      }
+      addToast('Account Removed', 'School Admin deleted from database.', 'warning');
+      return { success: true };
+    } catch (err) {
+      console.error('[DELETE SCHOOL ADMIN ERROR]:', err);
+      addToast('Deletion Failed', err.message || 'Failed to delete admin from database.', 'warning');
+      return { success: false, error: err.message };
     }
-    addToast('Account Removed', 'School Admin removed.', 'warning');
   };
 
   // Teacher CRUD

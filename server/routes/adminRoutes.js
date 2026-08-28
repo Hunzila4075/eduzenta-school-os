@@ -100,4 +100,118 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
   }
 });
 
+// ------------------------------------------------------------
+// PUT /api/admin/users/:id — Update User / Admin Record by Database ID
+// ------------------------------------------------------------
+router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const { name, school_name, schoolName } = req.body;
+
+  if (isNaN(userId)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation Error',
+      message: 'Invalid database user ID.'
+    });
+  }
+
+  const cleanName = name ? String(name).trim() : null;
+  const targetSchoolName = (school_name || schoolName) ? String(school_name || schoolName).trim() : null;
+
+  try {
+    const [existing] = await pool.query('SELECT id, school_id, name, email, role FROM users WHERE id = ?', [userId]);
+    const user = existing[0];
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'User record not found.'
+      });
+    }
+
+    // Update user record if name provided
+    if (cleanName) {
+      await pool.query('UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [cleanName, userId]);
+    }
+
+    // Update school name if school_id exists and school_name provided
+    if (targetSchoolName && user.school_id) {
+      await pool.query('UPDATE schools SET name = ? WHERE id = ?', [targetSchoolName, user.school_id]);
+    }
+
+    const [updatedRows] = await pool.query(
+      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.is_active, s.name as school_name 
+       FROM users u 
+       LEFT JOIN schools s ON s.id = u.school_id 
+       WHERE u.id = ?`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'User record updated successfully.',
+      user: updatedRows[0]
+    });
+  } catch (error) {
+    console.error('[UPDATE USER ERROR]:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+// ------------------------------------------------------------
+// DELETE /api/admin/users/:id — Delete User Account by Database ID
+// ------------------------------------------------------------
+router.delete('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res) => {
+  const userId = parseInt(req.params.id);
+
+  if (isNaN(userId)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation Error',
+      message: 'Invalid database user ID.'
+    });
+  }
+
+  try {
+    const [existing] = await pool.query('SELECT id, school_id, role FROM users WHERE id = ?', [userId]);
+    const user = existing[0];
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'User record not found.'
+      });
+    }
+
+    // Delete user from database
+    await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+
+    // If user was a school admin, optionally delete or disassociate school
+    if (user.school_id && user.role === 'admin') {
+      const [remainingAdmins] = await pool.query('SELECT id FROM users WHERE school_id = ? AND role = "admin"', [user.school_id]);
+      if (!remainingAdmins || remainingAdmins.length === 0) {
+        await pool.query('DELETE FROM schools WHERE id = ?', [user.school_id]);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'User account deleted successfully.'
+    });
+  } catch (error) {
+    console.error('[DELETE USER ERROR]:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
 export default router;

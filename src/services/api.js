@@ -37,7 +37,6 @@ async function request(endpoint, options = {}) {
     }
 
     if (response.status === 401) {
-      // Auth route returned 401 — invalid credentials
       const data = await response.json().catch(() => ({}));
       throw new Error(data.message || data.error || 'Invalid credentials. Please check your email and password.');
     }
@@ -94,7 +93,12 @@ export async function loginUser(email, password) {
   return data;
 }
 
-// 3. Super Admin: Onboard New School & Assign School Admin
+// 3. Auth: Fetch Live Profile for Authenticated Session
+export async function fetchMe() {
+  return request('/auth/me');
+}
+
+// 4. Super Admin: Onboard New School & Assign School Admin
 export async function createSchoolAdmin(payload) {
   // payload: { school_name, admin_name, admin_email, admin_password }
   return request('/superadmin/create-school-admin', {
@@ -103,12 +107,12 @@ export async function createSchoolAdmin(payload) {
   });
 }
 
-// 4. Super Admin: Fetch Schools
+// 5. Super Admin: Fetch Schools
 export async function fetchSchools() {
   return request('/superadmin/schools');
 }
 
-// 5. User Management: Create User Account (School Admin / Super Admin)
+// 6. User Management: Create User Account (School Admin / Super Admin)
 export async function createUser(userData) {
   // userData: { name, email, password, role }
   return request('/admin/create-user', {
@@ -117,12 +121,27 @@ export async function createUser(userData) {
   });
 }
 
-// 6. User Management: Fetch Users Scoped to School ID
+// 7. User Management: Fetch Users Scoped to School ID
 export async function fetchUsers() {
   return request('/admin/users');
 }
 
-// 7. Profile Update
+// 8. User Management: Update User Account Record by Database ID
+export async function updateUser(id, userData) {
+  return request(`/admin/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(userData)
+  });
+}
+
+// 9. User Management: Delete User Account by Database ID
+export async function deleteUser(id) {
+  return request(`/admin/users/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+// 10. Profile Update
 export async function updateProfile(name) {
   return request('/auth/profile', {
     method: 'PUT',
@@ -130,7 +149,7 @@ export async function updateProfile(name) {
   });
 }
 
-// 8. Password Update
+// 11. Password Update
 export async function updatePassword(currentPassword, newPassword) {
   return request('/auth/change-password', {
     method: 'PUT',
@@ -138,13 +157,13 @@ export async function updatePassword(currentPassword, newPassword) {
   });
 }
 
-// 9. Fetch Students (optionally filter by classSection)
+// 12. Fetch Students (optionally filter by classSection)
 export async function fetchStudents(classSection = '') {
   const query = classSection ? `?classSection=${encodeURIComponent(classSection)}` : '';
   return request(`/students${query}`);
 }
 
-// 10. Add / Enrol New Student
+// 13. Add / Enrol New Student
 export async function addStudent(studentData) {
   return request('/students', {
     method: 'POST',
@@ -152,7 +171,7 @@ export async function addStudent(studentData) {
   });
 }
 
-// 11. Fetch Attendance Logs (optionally filter by classSection & date)
+// 14. Fetch Attendance Logs (optionally filter by classSection & date)
 export async function fetchAttendance(classSection = '', date = '') {
   const params = new URLSearchParams();
   if (classSection) params.append('classSection', classSection);
@@ -161,7 +180,7 @@ export async function fetchAttendance(classSection = '', date = '') {
   return request(`/attendance${queryString}`);
 }
 
-// 12. Save / Record Class Attendance
+// 15. Save / Record Class Attendance
 export async function saveAttendance(attendancePayload) {
   return request('/attendance', {
     method: 'POST',
@@ -169,13 +188,13 @@ export async function saveAttendance(attendancePayload) {
   });
 }
 
-// 13. Fetch Broadcast Notes / Directives
+// 16. Fetch Broadcast Notes / Directives
 export async function fetchBroadcasts(targetSchoolId = 'all') {
   const query = targetSchoolId ? `?targetSchoolId=${encodeURIComponent(targetSchoolId)}` : '';
   return request(`/broadcasts${query}`);
 }
 
-// 14. Create / Publish Broadcast Directive
+// 17. Create / Publish Broadcast Directive
 export async function createBroadcast(broadcastPayload) {
   return request('/broadcasts', {
     method: 'POST',

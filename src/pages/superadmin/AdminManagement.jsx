@@ -128,17 +128,24 @@ export default function AdminManagement() {
     setIsEditModalOpen(true);
   };
 
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
-    updateSchoolAdmin(editingUserId, {
-      firstName,
-      lastName,
-      name: `${firstName} ${lastName}`,
-      schoolName,
-      schoolLogoUrl
-    });
-    setIsEditModalOpen(false);
-    resetForm();
+    setIsSubmitting(true);
+    try {
+      await updateSchoolAdmin(editingUserId, {
+        firstName,
+        lastName,
+        name: `${firstName} ${lastName}`,
+        schoolName,
+        schoolLogoUrl
+      });
+      setIsEditModalOpen(false);
+      resetForm();
+    } catch (err) {
+      console.error('[EDIT ADMIN ERROR]:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const columns = [
