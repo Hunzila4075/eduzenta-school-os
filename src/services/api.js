@@ -1,6 +1,5 @@
-// Centralized Full-Stack API Client Service for Eduzenta School OS
-
-const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL) : null) || 'https://eduzenta-school-os-production.up.railway.app/api';
+const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL))
+  || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5000/api' : 'https://eduzenta-school-os-production.up.railway.app/api');
 
 
 // Helper function for unified fetch requests with error handling

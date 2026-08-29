@@ -74,122 +74,88 @@ export function AppProvider({ children }) {
   const [attendanceOverrides, setAttendanceOverrides] = useState([]);
   const [activities, setActivities] = useState([]);
 
-  // Database Re-Hydration on Mount / Refresh
-  React.useEffect(() => {
-    async function loadDatabaseState() {
-      const savedToken = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
-      if (savedToken) {
-        // 1. Re-hydrate live user profile from MySQL
-        try {
-          const meRes = await fetchMeApi();
-          if (meRes?.user) {
-            const userWithAvatar = {
-              ...meRes.user,
-              avatar: meRes.user.avatar_url || meRes.user.avatar || null
-            };
-            setCurrentUser(prev => ({ ...(prev || {}), ...userWithAvatar }));
-            safeStoreUser(userWithAvatar);
-          }
-        } catch (err) {
-          // Token invalid — clear it
-          if (err.message && err.message.includes('expired')) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('eduzenta_token');
-          }
-          console.warn('[DB HYDRATION] fetchMe failed:', err.message);
-        }
-
-        // 2. Hydrate users list from MySQL DB
-        try {
-          const usersRes = await fetchUsersApi();
-          if (usersRes?.users && Array.isArray(usersRes.users)) {
-            const mappedUsers = usersRes.users.map(u => ({
-              id: u.id,
-              name: u.name,
-              email: u.email,
-              role: String(u.role || '').toLowerCase(),
-              schoolId: u.school_id,
-              school_id: u.school_id,
-              schoolName: u.school_name || 'Eduzenta School',
-              avatar: u.avatar_url || u.avatar || null,
-              avatar_url: u.avatar_url || u.avatar || null,
-              isActive: Boolean(u.is_active),
-              created_at: u.created_at
-            }));
-            setUsers(mappedUsers);
-          }
-        } catch (err) {
-          console.warn('[DB HYDRATION] fetchUsers failed:', err.message);
-        }
-
-        // 3. Hydrate schools list from MySQL DB (If Super Admin)
-        try {
-          const schoolsRes = await fetchSchoolsApi();
-          if (schoolsRes?.schools && Array.isArray(schoolsRes.schools)) {
-            const mappedSchools = schoolsRes.schools.map(s => ({
-              id: s.id,
-              name: s.name,
-              status: s.status || 'Active',
-              adminEmail: s.admin_email || 'No Admin Assigned',
-              adminName: s.admin_name || 'Unassigned',
-              monthlyRevenue: 1500,
-              studentsCount: 0,
-              teachersCount: 0,
-              createdAt: s.created_at
-            }));
-            setSchools(mappedSchools);
-          }
-        } catch (err) {
-          // Expected 403 for non-SuperAdmin users — ignore silently
-        }
-
-
-        // 4. Hydrate students list from MySQL DB
-        try {
-          const studentsRes = await fetchStudentsApi();
-          if (studentsRes?.data && Array.isArray(studentsRes.data)) {
-            const mappedStudents = studentsRes.data.map(st => ({
-              id: st.id,
-              rollNo: st.rollNo,
-              regNo: st.regNo,
-              name: st.name,
-              classSection: st.classSection,
-              gender: st.gender,
-              phone: st.phone,
-              guardianName: st.guardianName,
-              photo: st.photo || st.photoUrl || null,
-              photoUrl: st.photo || st.photoUrl || null,
-              status: st.status || 'Active',
-              createdAt: st.createdAt
-            }));
-            setStudents(mappedStudents);
-          }
-        } catch (err) {
-          console.warn('[DB HYDRATION] fetchStudents failed:', err.message);
-        }
-
-        // 5. Hydrate broadcast directives from MySQL DB
-        try {
-          const broadcastsRes = await fetchBroadcastsApi('all');
-          if (broadcastsRes?.data && Array.isArray(broadcastsRes.data)) {
-            setBroadcastNotes(broadcastsRes.data);
-          }
-        } catch (err) {
-          console.warn('[DB HYDRATION] fetchBroadcasts failed:', err.message);
-        }
-      } else {
-        // Unauthenticated visitor — still fetch public broadcasts
-        try {
-          const broadcastsRes = await fetchBroadcastsApi('all');
-          if (broadcastsRes?.data && Array.isArray(broadcastsRes.data)) {
-            setBroadcastNotes(broadcastsRes.data);
-          }
-        } catch (_) {}
-      }
+  // Database Re-Hydration on Mount / Refresh (Fast, Non-Blocking Parallel Execution)
+  const loadDatabaseStateNonBlocking = React.useCallback(async () => {
+    const savedToken = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
+    if (!savedToken) {
+      fetchBroadcastsApi('all').then(res => {
+        if (res?.data && Array.isArray(res.data)) setBroadcastNotes(res.data);
+      }).catch(() => {});
+      return;
     }
 
-    loadDatabaseState();
+    // Run all secondary API calls concurrently in parallel without blocking UI thread
+    Promise.allSettled([
+      fetchMeApi(),
+      fetchUsersApi(),
+      fetchSchoolsApi(),
+      fetchStudentsApi(),
+      fetchBroadcastsApi('all')
+    ]).then(([meResult, usersResult, schoolsResult, studentsResult, broadcastsResult]) => {
+      // 1. Live profile
+      if (meResult.status === 'fulfilled' && meResult.value?.user) {
+        const u = meResult.value.user;
+        const userWithAvatar = { ...u, avatar: u.avatar_url || u.avatar || null };
+        setCurrentUser(prev => ({ ...(prev || {}), ...userWithAvatar }));
+        safeStoreUser(userWithAvatar);
+      }
+      // 2. Users list
+      if (usersResult.status === 'fulfilled' && usersResult.value?.users) {
+        setUsers(usersResult.value.users.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: String(u.role || '').toLowerCase(),
+          schoolId: u.school_id,
+          school_id: u.school_id,
+          schoolName: u.school_name || 'Eduzenta School',
+          avatar: u.avatar_url || u.avatar || null,
+          avatar_url: u.avatar_url || u.avatar || null,
+          isActive: Boolean(u.is_active),
+          created_at: u.created_at
+        })));
+      }
+      // 3. Schools list
+      if (schoolsResult.status === 'fulfilled' && schoolsResult.value?.schools) {
+        setSchools(schoolsResult.value.schools.map(s => ({
+          id: s.id,
+          name: s.name,
+          status: s.status || 'Active',
+          adminEmail: s.admin_email || 'No Admin Assigned',
+          adminName: s.admin_name || 'Unassigned',
+          monthlyRevenue: 0,
+          studentsCount: 0,
+          teachersCount: 0,
+          createdAt: s.created_at
+        })));
+      }
+      // 4. Students list
+      if (studentsResult.status === 'fulfilled' && studentsResult.value?.data) {
+        setStudents(studentsResult.value.data.map(st => ({
+          id: st.id,
+          rollNo: st.rollNo,
+          regNo: st.regNo,
+          name: st.name,
+          classSection: st.classSection,
+          gender: st.gender,
+          phone: st.phone,
+          guardianName: st.guardianName,
+          photo: st.photo || st.photoUrl || null,
+          photoUrl: st.photo || st.photoUrl || null,
+          status: st.status || 'Active',
+          createdAt: st.createdAt
+        })));
+      }
+      // 5. Broadcast notes
+      if (broadcastsResult.status === 'fulfilled' && broadcastsResult.value?.data) {
+        setBroadcastNotes(broadcastsResult.value.data);
+      }
+    });
   }, []);
+
+  React.useEffect(() => {
+    loadDatabaseStateNonBlocking();
+  }, [loadDatabaseStateNonBlocking]);
 
   // Communication & Broadcast Notes State (Super Admin -> School Admins)
   const [broadcastNotes, setBroadcastNotes] = useState([]);
@@ -573,6 +539,9 @@ export function AppProvider({ children }) {
     } else {
       setCurrentView('admin-dash');
     }
+
+    // Trigger background data hydration asynchronously after navigating to dashboard
+    loadDatabaseStateNonBlocking();
 
     return { success: true };
   };
