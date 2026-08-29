@@ -25,7 +25,11 @@ router.post('/login', async (req, res) => {
 
   try {
     const [rows] = await query(
-      'SELECT id, school_id, name, email, password, role, avatar_url, is_active FROM users WHERE email = ?',
+      `SELECT u.id, u.school_id, u.name, u.email, u.password, u.role, u.avatar_url, u.is_active,
+              s.name as school_name, s.logo_url as school_logo_url, s.status as school_status
+       FROM users u
+       LEFT JOIN schools s ON s.id = u.school_id
+       WHERE u.email = ?`,
       [cleanEmail]
     );
 
@@ -60,9 +64,7 @@ router.post('/login', async (req, res) => {
     // School Account Lock Check (only affects non-superadmin users)
     const userRoleStr = String(user.role || '').toLowerCase();
     if (userRoleStr !== 'super_admin' && userRoleStr !== 'superadmin' && user.school_id) {
-      const [schoolRows] = await pool.query('SELECT status FROM schools WHERE id = ?', [user.school_id]);
-      const targetSchool = schoolRows[0];
-      if (targetSchool && targetSchool.status && String(targetSchool.status).toLowerCase().includes('lock')) {
+      if (user.school_status && String(user.school_status).toLowerCase().includes('lock')) {
         return res.status(403).json({
           success: false,
           code: 'ACCOUNT_LOCKED',
@@ -91,6 +93,11 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         school_id: user.school_id,
+        schoolId: user.school_id,
+        school_name: user.school_name,
+        schoolName: user.school_name,
+        school_logo_url: user.school_logo_url,
+        schoolLogoUrl: user.school_logo_url,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -122,7 +129,11 @@ router.get('/me', authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const [rows] = await pool.query(
-      'SELECT id, school_id, name, email, role, avatar_url, is_active, created_at, updated_at FROM users WHERE id = ?',
+      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, u.created_at, u.updated_at,
+              s.name as school_name, s.logo_url as school_logo_url, s.status as school_status
+       FROM users u
+       LEFT JOIN schools s ON s.id = u.school_id
+       WHERE u.id = ?`,
       [userId]
     );
     const user = rows[0];
@@ -144,9 +155,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 
     const userRoleStr = String(user.role || '').toLowerCase();
     if (userRoleStr !== 'super_admin' && userRoleStr !== 'superadmin' && user.school_id) {
-      const [schoolRows] = await pool.query('SELECT status FROM schools WHERE id = ?', [user.school_id]);
-      const targetSchool = schoolRows[0];
-      if (targetSchool && targetSchool.status && String(targetSchool.status).toLowerCase().includes('lock')) {
+      if (user.school_status && String(user.school_status).toLowerCase().includes('lock')) {
         return res.status(403).json({
           success: false,
           code: 'ACCOUNT_LOCKED',
@@ -160,6 +169,9 @@ router.get('/me', authenticateToken, async (req, res) => {
       success: true,
       user: {
         ...user,
+        schoolId: user.school_id,
+        schoolName: user.school_name,
+        schoolLogoUrl: user.school_logo_url,
         avatar: user.avatar_url
       }
     });

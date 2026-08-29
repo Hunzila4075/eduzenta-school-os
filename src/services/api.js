@@ -13,7 +13,7 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 
 
-// Helper function for unified fetch requests with error handling
+// Helper function for unified fetch requests with error handling + 10s timeout
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
@@ -24,8 +24,13 @@ async function request(endpoint, options = {}) {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
 
+  // AbortController gives us a hard 10s timeout — prevents infinite pending requests
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   const config = {
     ...options,
+    signal: controller.signal,
     headers: {
       ...defaultHeaders,
       ...options.headers
@@ -34,39 +39,37 @@ async function request(endpoint, options = {}) {
 
   try {
     const response = await fetch(url, config);
+    clearTimeout(timeoutId);
+
     const isAuthRoute = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
-    
-    // Explicit error handling for 401 Unauthorized - Purge session only on 401
+
     if (!isAuthRoute && response.status === 401) {
-      console.warn('[API SERVICE WARNING] Session token invalid or expired (401). Purging local credentials.');
+      console.warn('[API] Session expired (401). Purging credentials.');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('eduzenta_token');
       localStorage.removeItem('eduzenta_user');
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || data.error || 'Session expired or unauthorized. Please log in again.');
+      throw new Error(data.message || data.error || 'Session expired. Please log in again.');
     }
 
     if (response.status === 401) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || data.error || 'Invalid credentials. Please check your email and password.');
+      throw new Error(data.message || data.error || 'Invalid credentials.');
     }
 
-    // 403 Forbidden - Authenticated user lacks permission or account locked. DO NOT PURGE TOKEN.
     if (response.status === 403) {
       const data = await response.json().catch(() => ({}));
-      const err = new Error(data.message || data.error || 'Access forbidden: Insufficient permissions.');
+      const err = new Error(data.message || data.error || 'Access forbidden.');
       if (data.code) err.code = data.code;
       throw err;
     }
 
-    // Explicit error handling for 504 Gateway / Database Timeout
     if (response.status === 504) {
       throw new Error('Database response timeout. Please try again.');
     }
 
     const data = await response.json().catch(() => ({}));
-
     if (!response.ok) {
       const err = new Error(data.message || data.error || `HTTP Error ${response.status}`);
       if (data.code) err.code = data.code;
@@ -75,7 +78,11 @@ async function request(endpoint, options = {}) {
 
     return data;
   } catch (error) {
-    console.warn(`[API SERVICE WARNING] ${endpoint} request failed:`, error.message);
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out after 10 seconds. Please try again.');
+    }
+    console.warn(`[API] ${endpoint} failed:`, error.message);
     throw error;
   }
 }
@@ -97,7 +104,12 @@ export function safeStoreUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
-    school_id: user.school_id || user.schoolId || null
+    school_id: user.school_id || user.schoolId || null,
+    schoolId: user.school_id || user.schoolId || null,
+    school_name: user.school_name || user.schoolName || null,
+    schoolName: user.school_name || user.schoolName || null,
+    school_logo_url: user.school_logo_url || user.schoolLogoUrl || null,
+    schoolLogoUrl: user.school_logo_url || user.schoolLogoUrl || null
   };
   try {
     localStorage.setItem('user', JSON.stringify(lightweight));
@@ -204,6 +216,14 @@ export async function addStudent(studentData) {
   });
 }
 
+// 13b. Update Student Record by ID (fixes state-only update data loss)
+export async function updateStudent(id, data) {
+  return request(`/students/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+}
+
 // 14. Delete Student Record by ID
 export async function deleteStudent(id) {
   return request(`/students/${id}`, {
@@ -257,3 +277,10 @@ export async function toggleSchoolStatus(schoolId, status) {
   });
 }
 
+// 20. Super Admin / Admin: Update School Branding (Name & Logo)
+export async function updateSchoolBranding(schoolId, payload) {
+  return request(`/superadmin/schools/${schoolId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}

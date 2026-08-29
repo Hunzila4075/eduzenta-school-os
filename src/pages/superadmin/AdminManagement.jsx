@@ -53,7 +53,7 @@ export default function AdminManagement() {
 
   const resetForm = () => {
     setSchoolName('');
-    setSchoolLogoUrl('https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80');
+    setSchoolLogoUrl('');
     setFirstName('');
     setLastName('');
     setEmail('');
@@ -170,14 +170,20 @@ export default function AdminManagement() {
       accessor: 'schoolName',
       render: (row) => {
         const sch = schools.find(s => String(s.id) === String(row.schoolId) || String(s.id) === String(row.school_id));
-        const logo = sch?.logoUrl || row.schoolLogoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";
+        const logo = sch?.logoUrl || sch?.logo_url || row.schoolLogoUrl || row.school_logo_url;
         const displayName = sch?.name || row.schoolName || row.school_name || 'Eduzenta School';
         return (
           <div className="flex items-center gap-3">
-            <img src={logo} alt={displayName} className="w-9 h-9 rounded-lg object-cover border border-slate-300 p-0.5 bg-white shrink-0 shadow-xs" />
+            {logo ? (
+              <img src={logo} alt={displayName} className="w-9 h-9 rounded-lg object-cover border border-slate-300 p-0.5 bg-white shrink-0 shadow-xs" />
+            ) : (
+              <div className="w-9 h-9 rounded-lg bg-[#5A3193] text-white font-black text-xs flex items-center justify-center border border-purple-300 shrink-0 shadow-xs">
+                {(displayName || 'S').charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
               <div className="font-extrabold text-slate-900">{displayName}</div>
-              <div className="text-[10px] text-[#5A3193] font-bold uppercase tracking-wider">Dynamic Logo Bound</div>
+              <div className="text-[10px] text-[#5A3193] font-bold uppercase tracking-wider">Database Bound Branding</div>
             </div>
           </div>
         );

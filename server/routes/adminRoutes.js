@@ -161,7 +161,7 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
 // ------------------------------------------------------------
 router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const { name, email, school_name, schoolName, avatar, avatar_url, password, new_password, newPassword, is_active, isActive } = req.body;
+  const { name, email, school_name, schoolName, school_logo_url, schoolLogoUrl, schoolLogo, logo_url, logoUrl, avatar, avatar_url, password, new_password, newPassword, is_active, isActive } = req.body;
 
   if (isNaN(userId)) {
     return res.status(400).json({
@@ -174,6 +174,7 @@ router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res)
   const cleanName = name ? String(name).trim() : null;
   const cleanEmail = email ? String(email).trim().toLowerCase() : null;
   const targetSchoolName = (school_name || schoolName) ? String(school_name || schoolName).trim() : null;
+  const targetSchoolLogo = (school_logo_url || schoolLogoUrl || schoolLogo || logo_url || logoUrl) ? String(school_logo_url || schoolLogoUrl || schoolLogo || logo_url || logoUrl) : null;
   const targetAvatar = avatar || avatar_url || null;
   const targetPassword = password || new_password || newPassword || null;
 
@@ -182,87 +183,71 @@ router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res)
     const user = existing[0];
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Not Found',
-        message: 'User record not found.'
-      });
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'User record not found.' });
     }
 
     // Check email uniqueness if email is being updated
     if (cleanEmail && cleanEmail !== user.email) {
       const [emailConflict] = await pool.query('SELECT id FROM users WHERE email = ? AND id != ?', [cleanEmail, userId]);
       if (emailConflict && emailConflict.length > 0) {
-        return res.status(409).json({
-          success: false,
-          error: 'Conflict Error',
-          message: 'This email address is already in use by another user.'
-        });
+        return res.status(409).json({ success: false, error: 'Conflict Error', message: 'This email address is already in use by another user.' });
       }
-      await pool.query('UPDATE users SET email = ? WHERE id = ?', [cleanEmail, userId]);
     }
 
-    // Update name
-    if (cleanName) {
-      await pool.query('UPDATE users SET name = ? WHERE id = ?', [cleanName, userId]);
-    }
+    // Build a SINGLE dynamic UPDATE for users table — eliminates 5 serial round-trips
+    const userFields = [];
+    const userValues = [];
 
-    // Update avatar
-    if (targetAvatar) {
-      await pool.query('UPDATE users SET avatar_url = ? WHERE id = ?', [targetAvatar, userId]);
-    }
-
-    // Update active status
+    if (cleanName) { userFields.push('name = ?'); userValues.push(cleanName); }
+    if (cleanEmail && cleanEmail !== user.email) { userFields.push('email = ?'); userValues.push(cleanEmail); }
+    if (targetAvatar) { userFields.push('avatar_url = ?'); userValues.push(targetAvatar); }
     if (is_active !== undefined || isActive !== undefined) {
       const activeState = (is_active !== undefined) ? (is_active ? 1 : 0) : (isActive ? 1 : 0);
-      await pool.query('UPDATE users SET is_active = ? WHERE id = ?', [activeState, userId]);
+      userFields.push('is_active = ?');
+      userValues.push(activeState);
     }
-
-    // Secure Password Reset by Super Admin / School Admin
     if (targetPassword) {
       if (String(targetPassword).length < 6) {
-        return res.status(400).json({
-          success: false,
-          error: 'Validation Error',
-          message: 'Password must be at least 6 characters.'
-        });
+        return res.status(400).json({ success: false, error: 'Validation Error', message: 'Password must be at least 6 characters.' });
       }
       const hashedPassword = await bcrypt.hash(String(targetPassword), 10);
-      await pool.query('UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [hashedPassword, userId]);
+      userFields.push('password = ?');
+      userValues.push(hashedPassword);
     }
 
-    // Update school name if school_id exists and school_name provided
-    if (targetSchoolName && user.school_id) {
-      await pool.query('UPDATE schools SET name = ? WHERE id = ?', [targetSchoolName, user.school_id]);
+    // Always touch updated_at in the same single query
+    userFields.push('updated_at = CURRENT_TIMESTAMP');
+    userValues.push(userId);
+
+    if (userFields.length > 1) {
+      await pool.query(`UPDATE users SET ${userFields.join(', ')} WHERE id = ?`, userValues);
     }
 
-    await pool.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+    // Update school branding if provided (single conditional query)
+    if ((targetSchoolName || targetSchoolLogo) && user.school_id) {
+      const schoolFields = [];
+      const schoolValues = [];
+      if (targetSchoolName) { schoolFields.push('name = ?'); schoolValues.push(targetSchoolName); }
+      if (targetSchoolLogo) { schoolFields.push('logo_url = ?'); schoolValues.push(targetSchoolLogo); }
+      schoolValues.push(user.school_id);
+      await pool.query(`UPDATE schools SET ${schoolFields.join(', ')} WHERE id = ?`, schoolValues);
+    }
 
     const [updatedRows] = await pool.query(
-      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, s.name as school_name 
-       FROM users u 
-       LEFT JOIN schools s ON s.id = u.school_id 
-       WHERE u.id = ?`,
+      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, s.name as school_name, s.logo_url as school_logo_url
+       FROM users u LEFT JOIN schools s ON s.id = u.school_id WHERE u.id = ?`,
       [userId]
     );
-
     const updatedUser = updatedRows[0];
 
     return res.json({
       success: true,
       message: 'User record updated successfully.',
-      user: {
-        ...updatedUser,
-        avatar: updatedUser ? updatedUser.avatar_url : null
-      }
+      user: { ...updatedUser, avatar: updatedUser ? updatedUser.avatar_url : null }
     });
   } catch (error) {
     console.error('[UPDATE USER ERROR]:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Internal Server Error',
-      message: error.message
-    });
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
 

@@ -168,9 +168,8 @@ export default function UnifiedLoginPage() {
             disabled={isLoggingIn}
             className="w-full py-3 px-4 rounded-xl qobe-btn-primary text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60 min-h-[44px]"
           >
-            {isLoggingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            <span>{isLoggingIn ? 'Authenticating...' : 'Login'}</span>
-            {!isLoggingIn && <ArrowRight className="w-4 h-4" />}
+            <span>Login</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 

@@ -2,9 +2,9 @@ import React from 'react';
 import EduzentaLogo from '../common/EduzentaLogo';
 
 export default function ResultCardTemplate({ student, markData, schoolInfo, hideSignatures = false }) {
-  const schoolName = schoolInfo?.name || "EXCELLENCE INTERNATIONAL SCHOOL";
-  const schoolLogo = schoolInfo?.logoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";
-  const schoolAddress = schoolInfo?.address || "123 Education Boulevard, Knowledge City";
+  const schoolName = schoolInfo?.name || "Eduzenta School";
+  const schoolLogo = schoolInfo?.logoUrl || schoolInfo?.logo_url || "";
+  const schoolAddress = schoolInfo?.address || "Education Boulevard, Knowledge City";
 
   const subjects = markData?.subjects || [
     { name: "Physics", maxMarks: 100, obtainedMarks: 100, grade: "A+", remarks: "Excellent mechanics" },
@@ -33,11 +33,17 @@ export default function ResultCardTemplate({ student, markData, schoolInfo, hide
       {/* Dynamic School Logo Header */}
       <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4 mb-6">
         <div className="flex items-center gap-4">
-          <img
-            src={schoolLogo}
-            alt={schoolName}
-            className="w-16 h-16 rounded-lg object-cover border border-slate-400 p-0.5 shrink-0"
-          />
+          {schoolLogo ? (
+            <img
+              src={schoolLogo}
+              alt={schoolName}
+              className="w-16 h-16 rounded-lg object-cover border border-slate-400 p-0.5 shrink-0"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-lg bg-[#5A3193] text-white font-black text-2xl flex items-center justify-center border border-purple-400 shrink-0">
+              {(schoolName || 'E').charAt(0).toUpperCase()}
+            </div>
+          )}
           <div>
             <h1 className="text-xl font-black uppercase tracking-tight text-[#2d1a4e]">{schoolName}</h1>
             <p className="text-xs font-semibold text-slate-600">{schoolAddress}</p>

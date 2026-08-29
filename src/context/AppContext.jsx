@@ -7,6 +7,7 @@ import {
   fetchStudents as fetchStudentsApi,
   createUser as createUserApi,
   addStudent as addStudentApi,
+  updateStudent as updateStudentApi,
   updateUser as updateUserApi,
   deleteUser as deleteUserApi,
   deleteStudent as deleteStudentApi,
@@ -15,6 +16,7 @@ import {
   fetchBroadcasts as fetchBroadcastsApi,
   createBroadcast as createBroadcastApi,
   deleteBroadcast as deleteBroadcastApi,
+  saveAttendance as saveAttendanceApi,
   toggleSchoolStatus as toggleSchoolStatusApi
 } from '../services/api';
 
@@ -26,7 +28,12 @@ function safeStoreUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
-    school_id: user.school_id || user.schoolId || null
+    school_id: user.school_id || user.schoolId || null,
+    schoolId: user.school_id || user.schoolId || null,
+    school_name: user.school_name || user.schoolName || null,
+    schoolName: user.school_name || user.schoolName || null,
+    school_logo_url: user.school_logo_url || user.schoolLogoUrl || null,
+    schoolLogoUrl: user.school_logo_url || user.schoolLogoUrl || null
   };
   try {
     localStorage.setItem('user', JSON.stringify(lightweight));
@@ -57,8 +64,48 @@ function sanitizeLocalStorage() {
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
-  const [currentView, setCurrentView] = useState('landing');
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const savedUserStr = localStorage.getItem('user') || localStorage.getItem('eduzenta_user');
+      const savedToken = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
+      if (savedUserStr && savedToken) {
+        return JSON.parse(savedUserStr);
+      }
+    } catch (_) {}
+    return null;
+  });
+
+  const [currentView, setCurrentViewState] = useState(() => {
+    try {
+      const savedToken = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
+      const savedUserStr = localStorage.getItem('user') || localStorage.getItem('eduzenta_user');
+      const savedView = localStorage.getItem('eduzenta_current_view');
+
+      if (savedToken && savedUserStr) {
+        if (savedView && savedView !== 'landing' && savedView !== 'login') {
+          return savedView;
+        }
+        const user = JSON.parse(savedUserStr);
+        const role = String(user?.role || '').toLowerCase();
+        if (role === 'superadmin' || role === 'super_admin') return 'superadmin-dash';
+        if (role === 'admin') return 'admin-dash';
+        if (role === 'teacher') return 'teacher-dash';
+      }
+    } catch (_) {}
+    return 'landing';
+  });
+
+  const setCurrentView = (view) => {
+    try {
+      if (view && view !== 'landing' && view !== 'login') {
+        localStorage.setItem('eduzenta_current_view', view);
+      } else {
+        localStorage.removeItem('eduzenta_current_view');
+      }
+    } catch (_) {}
+    setCurrentViewState(view);
+  };
+
   const [lockedModal, setLockedModal] = useState({ open: false, email: '', message: '' });
 
   // Core Data States — start EMPTY; populated from MySQL on mount
@@ -73,6 +120,25 @@ export function AppProvider({ children }) {
   React.useEffect(() => { sanitizeLocalStorage(); }, []);
   const [attendanceOverrides, setAttendanceOverrides] = useState([]);
   const [activities, setActivities] = useState([]);
+
+  // Computed live current school for active session
+  const currentSchool = React.useMemo(() => {
+    if (!currentUser) return null;
+    const targetSchoolId = currentUser.school_id || currentUser.schoolId;
+    const found = schools.find(s => String(s.id) === String(targetSchoolId));
+    if (found) return found;
+
+    if (currentUser.schoolName || currentUser.school_name || currentUser.schoolLogoUrl || currentUser.school_logo_url) {
+      return {
+        id: targetSchoolId,
+        name: currentUser.schoolName || currentUser.school_name,
+        logoUrl: currentUser.schoolLogoUrl || currentUser.school_logo_url,
+        logo_url: currentUser.schoolLogoUrl || currentUser.school_logo_url,
+        status: 'Active'
+      };
+    }
+    return null;
+  }, [schools, currentUser]);
 
   // Database Re-Hydration on Mount / Refresh (Fast, Non-Blocking Parallel Execution)
   const loadDatabaseStateNonBlocking = React.useCallback(async () => {
@@ -95,11 +161,17 @@ export function AppProvider({ children }) {
       // 1. Live profile
       if (meResult.status === 'fulfilled' && meResult.value?.user) {
         const u = meResult.value.user;
-        const userWithAvatar = { ...u, avatar: u.avatar_url || u.avatar || null };
+        const userWithAvatar = {
+          ...u,
+          schoolId: u.school_id || u.schoolId,
+          schoolName: u.school_name || u.schoolName,
+          schoolLogoUrl: u.school_logo_url || u.schoolLogoUrl,
+          avatar: u.avatar_url || u.avatar || null
+        };
         setCurrentUser(prev => ({ ...(prev || {}), ...userWithAvatar }));
         safeStoreUser(userWithAvatar);
       }
-      // 2. Users list
+      // 2. Users list — strip raw avatar blobs from React state to prevent memory bloat
       if (usersResult.status === 'fulfilled' && usersResult.value?.users) {
         setUsers(usersResult.value.users.map(u => ({
           id: u.id,
@@ -109,8 +181,10 @@ export function AppProvider({ children }) {
           schoolId: u.school_id,
           school_id: u.school_id,
           schoolName: u.school_name || 'Eduzenta School',
-          avatar: u.avatar_url || u.avatar || null,
-          avatar_url: u.avatar_url || u.avatar || null,
+          schoolLogoUrl: u.school_logo_url || u.schoolLogoUrl || null,
+          // Store avatar as URL string only — never store raw base64 blobs in React state
+          avatar: (u.avatar_url && !String(u.avatar_url).startsWith('data:')) ? u.avatar_url : null,
+          avatar_url: (u.avatar_url && !String(u.avatar_url).startsWith('data:')) ? u.avatar_url : null,
           isActive: Boolean(u.is_active),
           created_at: u.created_at
         })));
@@ -120,6 +194,8 @@ export function AppProvider({ children }) {
         setSchools(schoolsResult.value.schools.map(s => ({
           id: s.id,
           name: s.name,
+          logo_url: s.logo_url || s.logoUrl || null,
+          logoUrl: s.logo_url || s.logoUrl || null,
           status: s.status || 'Active',
           adminEmail: s.admin_email || 'No Admin Assigned',
           adminName: s.admin_name || 'Unassigned',
@@ -258,62 +334,69 @@ export function AppProvider({ children }) {
     addToast('Attendance Deleted', 'Record removed.', 'warning');
   };
 
-  const adminRecordClassAttendance = (classSection, date, recordsArray) => {
+  const adminRecordClassAttendance = async (classSection, date, recordsArray) => {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'superadmin')) {
       addToast('Permission Denied', 'Only admins can record class attendance.', 'warning');
       return;
     }
-
+    const schoolId = currentUser.school_id || currentUser.schoolId || null;
+    // Optimistic local update
     setAttendance(prev => {
       const existingIdx = prev.findIndex(a => a.classSection === classSection && a.date === date);
       const entryObj = {
         id: existingIdx >= 0 ? prev[existingIdx].id : `att_${Date.now()}`,
-        classSection,
-        date,
+        classSection, date,
         isLockedByTeacher: true,
         recordedBy: `${currentUser.name} (Admin)`,
-        records: recordsArray // [{ studentId, studentName, status }]
+        records: recordsArray
       };
-
-      if (existingIdx >= 0) {
-        const copy = [...prev];
-        copy[existingIdx] = entryObj;
-        return copy;
-      }
+      if (existingIdx >= 0) { const copy = [...prev]; copy[existingIdx] = entryObj; return copy; }
       return [entryObj, ...prev];
     });
-
-    addToast('Attendance Saved', `Attendance for ${classSection} on ${date} saved successfully.`, 'success');
+    // Persist to MySQL
+    try {
+      await saveAttendanceApi({
+        classSection, date, school_id: schoolId,
+        records: recordsArray.map(r => ({ studentId: r.studentId, status: r.status })),
+        markedBy: `${currentUser.name} (Admin)`
+      });
+      addToast('Attendance Saved', `${classSection} on ${date} saved to database.`, 'success');
+    } catch (err) {
+      console.error('[ADMIN ATTENDANCE ERROR]:', err);
+      addToast('Attendance Save Failed', err.message || 'Failed to save attendance to database.', 'warning');
+    }
   };
 
-  // Teacher attendance save: saves/updates a dated attendance record for a class
-  const saveTeacherAttendance = (classSection, date, recordsArray, lock = false) => {
+  // Teacher attendance save: saves to MySQL + updates local state (optimistic)
+  const saveTeacherAttendance = async (classSection, date, recordsArray, lock = false) => {
     if (!currentUser) return;
+    const schoolId = currentUser.school_id || currentUser.schoolId || null;
+    // Optimistic local state update for instant UI
     setAttendance(prev => {
       const safeArr = Array.isArray(prev) ? prev : [];
-      const existingIdx = safeArr.findIndex(
-        a => a.classSection === classSection && a.date === date
-      );
+      const existingIdx = safeArr.findIndex(a => a.classSection === classSection && a.date === date);
       const entryObj = {
         id: existingIdx >= 0 ? safeArr[existingIdx].id : `att_${Date.now()}`,
-        classSection,
-        date,
+        classSection, date,
         isLockedByTeacher: lock,
         recordedBy: `${currentUser.name || 'Teacher'} (Teacher)`,
-        records: recordsArray // [{ studentId, studentName, status }]
+        records: recordsArray
       };
-      if (existingIdx >= 0) {
-        const copy = [...safeArr];
-        copy[existingIdx] = entryObj;
-        return copy;
-      }
+      if (existingIdx >= 0) { const copy = [...safeArr]; copy[existingIdx] = entryObj; return copy; }
       return [entryObj, ...safeArr];
     });
-    addToast(
-      lock ? 'Attendance Submitted & Locked' : 'Attendance Saved',
-      `${classSection} attendance on ${date} has been ${lock ? 'locked' : 'saved'}.`,
-      'success'
-    );
+    // Persist to MySQL
+    try {
+      await saveAttendanceApi({
+        classSection, date, school_id: schoolId,
+        records: recordsArray.map(r => ({ studentId: r.studentId, status: r.status })),
+        markedBy: `${currentUser.name || 'Teacher'} (${lock ? 'Locked' : 'Teacher'})`
+      });
+      addToast(lock ? 'Attendance Submitted & Locked' : 'Attendance Saved', `${classSection} on ${date} saved to database.`, 'success');
+    } catch (err) {
+      console.error('[SAVE ATTENDANCE ERROR]:', err);
+      addToast('Attendance Save Failed', err.message || 'Failed to save attendance to database.', 'warning');
+    }
   };
 
   // Teacher attendance load: returns records for a specific class+date from attendance state
@@ -540,8 +623,8 @@ export function AppProvider({ children }) {
       setCurrentView('admin-dash');
     }
 
-    // Trigger background data hydration asynchronously after navigating to dashboard
-    loadDatabaseStateNonBlocking();
+    // NOTE: Do NOT call loadDatabaseStateNonBlocking here.
+    // It already fires on mount via useEffect and would duplicate all 5 parallel API calls.
 
     return { success: true };
   };
@@ -759,9 +842,32 @@ export function AppProvider({ children }) {
     }
   };
 
-  const updateTeacher = (teacherId, updatedData) => {
-    setUsers(prev => prev.map(u => u.id === teacherId ? { ...u, ...updatedData, email: u.email } : u));
-    addToast('Teacher Updated', 'Faculty details saved.', 'success');
+  const updateTeacher = async (teacherId, updatedData) => {
+    const numericId = parseInt(String(teacherId).replace(/\D/g, ''));
+    // Optimistically update React state first for instant UI feedback
+    setUsers(prev => prev.map(u => u.id === teacherId ? { ...u, ...updatedData } : u));
+    try {
+      if (!isNaN(numericId) && numericId > 0) {
+        const res = await updateUserApi(numericId, {
+          name: updatedData.name,
+          ...(updatedData.email ? { email: updatedData.email } : {}),
+          ...(updatedData.password ? { password: updatedData.password } : {}),
+          ...(updatedData.assignedClasses !== undefined ? {} : {})
+        });
+        // Update state with confirmed DB values
+        if (res?.user) {
+          setUsers(prev => prev.map(u => (u.id === teacherId || u.id === numericId) ? { ...u, name: res.user.name, email: res.user.email } : u));
+        }
+      }
+      addToast('Teacher Updated', 'Faculty details saved to database.', 'success');
+      return { success: true };
+    } catch (err) {
+      // Revert optimistic update on failure
+      setUsers(prev => prev.map(u => u.id === teacherId ? { ...u, ...updatedData } : u));
+      console.error('[UPDATE TEACHER ERROR]:', err);
+      addToast('Update Failed', err.message || 'Failed to update teacher in database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   const deleteTeacher = async (teacherId) => {
@@ -807,15 +913,40 @@ export function AppProvider({ children }) {
     }
   };
 
-  const updateStudent = (id, data) => {
+  const updateStudent = async (id, data) => {
+    // Optimistic update for instant UI feedback
     setStudents(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-    addToast('Student Updated', 'Record saved.', 'success');
+    try {
+      const res = await updateStudentApi(id, data);
+      if (res?.data) {
+        // Sync with confirmed DB values
+        setStudents(prev => prev.map(s => s.id === id ? { ...s, ...res.data } : s));
+      }
+      addToast('Student Updated', 'Record saved to database.', 'success');
+      return { success: true };
+    } catch (err) {
+      console.error('[UPDATE STUDENT ERROR]:', err);
+      addToast('Update Failed', err.message || 'Failed to update student in database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
-  const deactivateStudent = (id) => {
-    setStudents(prev => prev.map(s => s.id === id ? { ...s, status: s.status === 'Active' ? 'Deactivated' : 'Active' } : s));
-
-    addToast('Status Toggled', 'Student active status updated.', 'info');
+  const deactivateStudent = async (id) => {
+    const currentStudent = students.find(s => s.id === id);
+    const newStatus = currentStudent?.status === 'Active' ? 'Inactive' : 'Active';
+    // Optimistic update
+    setStudents(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s));
+    try {
+      await updateStudentApi(id, { status: newStatus });
+      addToast('Status Updated', `Student set to ${newStatus} in database.`, 'info');
+      return { success: true };
+    } catch (err) {
+      // Revert on failure
+      setStudents(prev => prev.map(s => s.id === id ? { ...s, status: currentStudent?.status || 'Active' } : s));
+      console.error('[DEACTIVATE STUDENT ERROR]:', err);
+      addToast('Update Failed', err.message || 'Failed to update student status.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   const deleteStudent = async (studentId) => {
@@ -1019,6 +1150,7 @@ export function AppProvider({ children }) {
         setLockedModal,
         users,
         schools,
+        currentSchool,
         students,
         marks,
         chalans,

@@ -11,13 +11,13 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'eduzenta_db',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 15,       // up from 10 — handles more concurrent requests
   maxIdle: 10,
   idleTimeout: 60000,
-  connectTimeout: 20000,
-  queueLimit: 0,
+  connectTimeout: 8000,      // down from 20000 — fail fast, don't stall UI for 20s
+  queueLimit: 50,            // cap queue depth to prevent memory pressure
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 10000
 });
 
 // Helper test function to check database connectivity

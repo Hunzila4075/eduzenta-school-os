@@ -30,8 +30,9 @@ export default function AppSidebar() {
   const isAdmin = roleStr === 'admin';
   const isTeacher = roleStr === 'teacher';
 
-  const currentSchool = schools.find(s => s.id === currentUser.schoolId);
-  const schoolLogo = currentSchool?.logoUrl || currentUser.schoolLogoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";
+  const currentSchool = schools.find(s => String(s.id) === String(currentUser?.schoolId || currentUser?.school_id));
+  const schoolLogo = currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url;
+  const schoolDisplayName = currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || (isSuperAdmin ? 'Eduzenta Master HQ' : 'School Management');
 
   let navItems = [];
 
@@ -126,17 +127,23 @@ export default function AppSidebar() {
 
         {/* Dynamic School Branding Card */}
         <div className="mx-3 my-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center gap-3">
-          <img
-            src={schoolLogo}
-            alt={currentUser.schoolName || 'School Logo'}
-            className="w-9 h-9 rounded-lg object-cover border border-purple-400/40 bg-white p-0.5"
-          />
+          {schoolLogo ? (
+            <img
+              src={schoolLogo}
+              alt={schoolDisplayName}
+              className="w-9 h-9 rounded-lg object-cover border border-purple-400/40 bg-white p-0.5 shrink-0 shadow-xs"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#5A3193] to-purple-800 text-white font-black text-xs flex items-center justify-center border border-purple-400/40 shrink-0 shadow-xs">
+              {(schoolDisplayName || 'S').charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-[9px] font-black uppercase tracking-widest text-purple-400">
               {isSuperAdmin ? 'Super Admin HQ' : isAdmin ? 'School Admin' : 'Faculty Member'}
             </p>
             <p className="text-xs font-bold text-white truncate leading-snug">
-              {currentUser.schoolName || 'Eduzenta Platform'}
+              {schoolDisplayName}
             </p>
           </div>
         </div>

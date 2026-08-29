@@ -10,6 +10,7 @@ USE `eduzenta_db`;
 CREATE TABLE IF NOT EXISTS `schools` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(255) NOT NULL,
+  `logo_url` LONGTEXT DEFAULT NULL,
   `status` VARCHAR(50) DEFAULT 'Active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -27,6 +28,9 @@ CREATE TABLE IF NOT EXISTS `users` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX `idx_school_id` (`school_id`),
+  INDEX `idx_role` (`role`),
+  INDEX `idx_school_role` (`school_id`, `role`),
+  INDEX `idx_is_active` (`is_active`),
   FOREIGN KEY (`school_id`) REFERENCES `schools` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -57,6 +61,8 @@ CREATE TABLE IF NOT EXISTS `students` (
   `status` ENUM('Active', 'Inactive', 'Suspended') DEFAULT 'Active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_school_id` (`school_id`),
+  INDEX `idx_school_class` (`school_id`, `class_section`),
   INDEX `idx_class_section` (`class_section`),
   INDEX `idx_roll_number` (`roll_number`),
   INDEX `idx_status` (`status`)

@@ -30,22 +30,27 @@ import UserChangePassword from './pages/profile/UserChangePassword';
 export default function App() {
   const { currentView, currentUser, setCurrentUser, setCurrentView } = useApp();
 
-  // Persistent Hydration on App Mount
+  // Persistent Hydration on App Mount — preserve exact subpage route if already authenticated
   useEffect(() => {
     try {
       const savedUserStr = localStorage.getItem('user') || localStorage.getItem('eduzenta_user');
       const savedToken = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
+      const savedView = localStorage.getItem('eduzenta_current_view');
 
       if (savedUserStr && savedToken && !currentUser) {
         const user = JSON.parse(savedUserStr);
         setCurrentUser(user);
-        const role = String(user.role || '').toLowerCase();
-        if (role === 'superadmin' || role === 'super_admin') {
-          setCurrentView('superadmin-dash');
-        } else if (role === 'admin') {
-          setCurrentView('admin-dash');
-        } else if (role === 'teacher') {
-          setCurrentView('teacher-dash');
+        if (savedView && savedView !== 'landing' && savedView !== 'login') {
+          setCurrentView(savedView);
+        } else {
+          const role = String(user.role || '').toLowerCase();
+          if (role === 'superadmin' || role === 'super_admin') {
+            setCurrentView('superadmin-dash');
+          } else if (role === 'admin') {
+            setCurrentView('admin-dash');
+          } else if (role === 'teacher') {
+            setCurrentView('teacher-dash');
+          }
         }
       }
     } catch (err) {

@@ -20,11 +20,12 @@ export default function FeeManagement() {
     autoGenerateMonthlyChalans
   } = useApp();
 
-  const currentSchool = schools.find(s => s.id === currentUser?.schoolId) || schools[0];
+  const currentSchool = schools.find(s => String(s.id) === String(currentUser?.schoolId || currentUser?.school_id)) || schools[0];
+
   const schoolInfo = {
-    name: currentSchool?.name || currentUser?.schoolName || "EXCELLENCE INTERNATIONAL SCHOOL",
-    logoUrl: currentSchool?.logoUrl || currentUser?.schoolLogoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80",
-    address: currentSchool?.address || "123 Education Boulevard, Knowledge City"
+    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || "Eduzenta School",
+    logoUrl: currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || "",
+    address: currentSchool?.address || "Education Boulevard, Knowledge City"
   };
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

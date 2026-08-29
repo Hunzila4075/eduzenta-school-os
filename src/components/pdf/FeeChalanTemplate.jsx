@@ -3,8 +3,8 @@ import EduzentaLogo from '../common/EduzentaLogo';
 import { Scissors, CreditCard, Building2, Smartphone, CheckCircle2 } from 'lucide-react';
 
 export default function FeeChalanTemplate({ chalan, schoolInfo }) {
-  const schoolName = schoolInfo?.name || chalan?.schoolName || "EXCELLENCE INTERNATIONAL SCHOOL";
-  const schoolLogo = schoolInfo?.logoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";
+  const schoolName = schoolInfo?.name || chalan?.schoolName || "Eduzenta School";
+  const schoolLogo = schoolInfo?.logoUrl || schoolInfo?.logo_url || "";
 
   const isPaid = chalan?.status === 'Paid';
 
@@ -44,11 +44,17 @@ export default function FeeChalanTemplate({ chalan, schoolInfo }) {
               {/* Top Branding Bar */}
               <div className="flex items-center justify-between border-b-2 border-[#5A3193] pb-2 mb-2">
                 <div className="flex items-center gap-2">
-                  <img
-                    src={schoolLogo}
-                    alt={schoolName}
-                    className="w-10 h-10 rounded-md object-cover border border-slate-300 p-0.5 shrink-0 bg-white"
-                  />
+                  {schoolLogo ? (
+                    <img
+                      src={schoolLogo}
+                      alt={schoolName}
+                      className="w-10 h-10 rounded-md object-cover border border-slate-300 p-0.5 shrink-0 bg-white"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-md bg-[#5A3193] text-white font-black text-base flex items-center justify-center border border-purple-400 shrink-0">
+                      {(schoolName || 'E').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-xs font-black uppercase text-[#2d1a4e] tracking-tight truncate max-w-[200px]">{schoolName}</h2>
                     <p className="text-[9px] font-extrabold text-[#5A3193] uppercase">FEE CHALLAN • {chalan?.term || "1st Term"}</p>

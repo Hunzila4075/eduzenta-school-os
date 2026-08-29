@@ -12,10 +12,20 @@ export async function initializeDatabase() {
         CREATE TABLE IF NOT EXISTS \`schools\` (
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
           \`name\` VARCHAR(255) NOT NULL,
+          \`logo_url\` LONGTEXT DEFAULT NULL,
           \`status\` VARCHAR(50) DEFAULT 'Active',
           \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
+
+      // Ensure logo_url column exists if table existed previously without it
+      try {
+        await connection.query(`
+          ALTER TABLE \`schools\` ADD COLUMN \`logo_url\` LONGTEXT DEFAULT NULL AFTER \`name\`;
+        `);
+      } catch (err) {
+        // Ignore if column already exists
+      }
 
       // Ensure status column allows flexible status strings
       try {
@@ -149,6 +159,47 @@ export async function initializeDatabase() {
       } catch (err) {
         // Column already exists, ignore
       }
+
+      // ================================================================
+      // PERFORMANCE INDEXES — Add missing indexes on live databases
+      // Each ALTER TABLE is wrapped in try/catch so it's idempotent
+      // (safe to run on startup even if index already exists)
+      // ================================================================
+
+      // users(role) — speeds up filtering teachers vs admins
+      try {
+        await connection.query(`ALTER TABLE \`users\` ADD INDEX \`idx_role\` (\`role\`)`);
+      } catch (_) { /* already exists */ }
+
+      // users(school_id, role) composite — fast scoped role queries
+      try {
+        await connection.query(`ALTER TABLE \`users\` ADD INDEX \`idx_school_role\` (\`school_id\`, \`role\`)`);
+      } catch (_) { /* already exists */ }
+
+      // users(is_active) — speeds up active user filtering
+      try {
+        await connection.query(`ALTER TABLE \`users\` ADD INDEX \`idx_is_active\` (\`is_active\`)`);
+      } catch (_) { /* already exists */ }
+
+      // students(school_id) — CRITICAL: scopes student queries to school
+      try {
+        await connection.query(`ALTER TABLE \`students\` ADD INDEX \`idx_school_id\` (\`school_id\`)`);
+      } catch (_) { /* already exists */ }
+
+      // students(school_id, class_section) composite — fast class roster queries
+      try {
+        await connection.query(`ALTER TABLE \`students\` ADD INDEX \`idx_school_class\` (\`school_id\`, \`class_section\`)`);
+      } catch (_) { /* already exists */ }
+
+      // attendance(school_id) — scopes attendance to school
+      try {
+        await connection.query(`ALTER TABLE \`attendance\` ADD INDEX \`idx_school_id\` (\`school_id\`)`);
+      } catch (_) { /* already exists */ }
+
+      // attendance(school_id, date, class_section) — fast class+date queries
+      try {
+        await connection.query(`ALTER TABLE \`attendance\` ADD INDEX \`idx_school_date_class\` (\`school_id\`, \`date\`, \`class_section\`)`);
+      } catch (_) { /* already exists */ }
 
       // 7. SUPER ADMIN SEED — ONLY CREATE IF NOT EXISTS (DO NOT OVERWRITE ON RESTART)
       const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'developerwithkhan804@gmail.com';

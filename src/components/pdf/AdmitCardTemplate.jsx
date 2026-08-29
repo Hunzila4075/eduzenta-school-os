@@ -2,9 +2,9 @@ import React from 'react';
 import EduzentaLogo from '../common/EduzentaLogo';
 
 export default function AdmitCardTemplate({ student, schoolInfo }) {
-  const schoolName = schoolInfo?.name || "EXCELLENCE INTERNATIONAL SCHOOL";
-  const schoolLogo = schoolInfo?.logoUrl || "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80";
-  const schoolAddress = schoolInfo?.address || "123 Education Boulevard, Knowledge City";
+  const schoolName = schoolInfo?.name || "Eduzenta School";
+  const schoolLogo = schoolInfo?.logoUrl || schoolInfo?.logo_url || "";
+  const schoolAddress = schoolInfo?.address || "Education Boulevard, Knowledge City";
 
   const schedule = [
     { date: "2026-09-01", day: "Monday", subject: "Mathematics", time: "09:00 AM - 12:00 PM", room: "Hall A (Desk 14)" },
@@ -19,11 +19,17 @@ export default function AdmitCardTemplate({ student, schoolInfo }) {
       {/* Dynamic School Logo Header */}
       <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3 mb-4">
         <div className="flex items-center gap-3">
-          <img
-            src={schoolLogo}
-            alt={schoolName}
-            className="w-12 h-12 rounded-lg object-cover border border-slate-400 p-0.5 shrink-0"
-          />
+          {schoolLogo ? (
+            <img
+              src={schoolLogo}
+              alt={schoolName}
+              className="w-12 h-12 rounded-lg object-cover border border-slate-400 p-0.5 shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-lg bg-[#5A3193] text-white font-black text-xl flex items-center justify-center border border-purple-400 shrink-0">
+              {(schoolName || 'E').charAt(0).toUpperCase()}
+            </div>
+          )}
           <div>
             <h1 className="text-lg font-black uppercase text-[#2d1a4e]">{schoolName}</h1>
             <p className="text-xs text-slate-500 font-medium">{schoolAddress}</p>
