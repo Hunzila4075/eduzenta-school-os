@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import pool from '../config/db.js';
+import pool, { query } from '../config/db.js';
 import JWT_SECRET from '../config/jwtConfig.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -24,7 +24,7 @@ router.post('/login', async (req, res) => {
   const cleanEmail = String(email).trim().toLowerCase();
 
   try {
-    const [rows] = await pool.query(
+    const [rows] = await query(
       'SELECT id, school_id, name, email, password, role, avatar_url, is_active FROM users WHERE email = ?',
       [cleanEmail]
     );

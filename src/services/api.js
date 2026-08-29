@@ -1,5 +1,16 @@
-const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL))
-  || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5000/api' : 'https://eduzenta-school-os-production.up.railway.app/api');
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // Local dev: always use relative /api so Vite proxy forwards to local Express server on port 5000
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || (typeof import.meta !== 'undefined' && import.meta.env?.DEV)) {
+      return '/api';
+    }
+    // Production browser: use env var if provided, or default to relative /api
+    return (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) || '/api';
+  }
+  return (typeof process !== 'undefined' && process.env?.VITE_API_BASE_URL) || 'https://eduzenta-school-os-production.up.railway.app/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 
 // Helper function for unified fetch requests with error handling

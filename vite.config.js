@@ -15,11 +15,13 @@ export default defineConfig({
     }
   },
   server: {
+    port: 5173,
     proxy: {
       '/api': {
-        target: 'https://eduzenta-school-os-production.up.railway.app',
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        secure: true,
+        secure: false,
+        rewrite: (path) => path,
       },
     },
   },

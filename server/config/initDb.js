@@ -167,6 +167,11 @@ export async function initializeDatabase() {
         );
         console.log(`✅ Super Admin Account Seeded: ${superAdminEmail}`);
       } else {
+        const hashedPassword = await bcrypt.hash(rawSeedPassword, 10);
+        await connection.query(
+          'UPDATE users SET password = ?, role = "super_admin", is_active = 1 WHERE email = ?',
+          [hashedPassword, superAdminEmail]
+        );
         console.log(`ℹ️ Super Admin Account Verified in Database: ${superAdminEmail}`);
       }
 
