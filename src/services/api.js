@@ -42,10 +42,12 @@ async function request(endpoint, options = {}) {
       throw new Error(data.message || data.error || 'Invalid credentials. Please check your email and password.');
     }
 
-    // 403 Forbidden - Authenticated user lacks permission. DO NOT PURGE TOKEN.
+    // 403 Forbidden - Authenticated user lacks permission or account locked. DO NOT PURGE TOKEN.
     if (response.status === 403) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || data.error || 'Access forbidden: Insufficient permissions.');
+      const err = new Error(data.message || data.error || 'Access forbidden: Insufficient permissions.');
+      if (data.code) err.code = data.code;
+      throw err;
     }
 
     // Explicit error handling for 504 Gateway / Database Timeout
@@ -56,7 +58,9 @@ async function request(endpoint, options = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(data.message || data.error || `HTTP Error ${response.status}`);
+      const err = new Error(data.message || data.error || `HTTP Error ${response.status}`);
+      if (data.code) err.code = data.code;
+      throw err;
     }
 
     return data;
@@ -227,3 +231,19 @@ export async function createBroadcast(broadcastPayload) {
     body: JSON.stringify(broadcastPayload)
   });
 }
+
+// 18. Delete Broadcast Directive
+export async function deleteBroadcast(id) {
+  return request(`/broadcasts/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+// 19. Super Admin: Toggle School Status (Active / Locked)
+export async function toggleSchoolStatus(schoolId, status) {
+  return request(`/superadmin/schools/${schoolId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status })
+  });
+}
+

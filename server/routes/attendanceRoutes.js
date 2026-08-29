@@ -3,10 +3,7 @@ import pool from '../config/db.js';
 
 const router = express.Router();
 
-// Fallback memory state for attendance records
-const mockAttendance = [];
-
-// GET /api/attendance — Fetch attendance records by classSection and/or date
+// GET /api/attendance — Fetch attendance records by classSection and/or date from MySQL
 router.get('/', async (req, res) => {
   const { classSection, date } = req.query;
   try {
@@ -38,19 +35,12 @@ router.get('/', async (req, res) => {
 
     return res.json({ success: true, count: formatted.length, data: formatted });
   } catch (error) {
-    console.warn('[ATTENDANCE API] Database query failed, returning fallback memory data:', error.message);
-    let filtered = mockAttendance;
-    if (classSection) {
-      filtered = filtered.filter(a => a.classSection === classSection);
-    }
-    if (date) {
-      filtered = filtered.filter(a => a.date === date);
-    }
-    return res.json({ success: true, isMock: true, count: filtered.length, data: filtered });
+    console.error('[ATTENDANCE API ERROR]:', error);
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
 
-// POST /api/attendance — Record or bulk update class attendance for a specific date
+// POST /api/attendance — Record or bulk update class attendance for a specific date in MySQL
 router.post('/', async (req, res) => {
   const { classSection, date, records, markedBy } = req.body;
   // records: [{ studentId, status: 'Present' | 'Absent' | 'Late' | 'Excused' }]
@@ -58,67 +48,37 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ success: false, error: 'ClassSection, date, and non-empty records array are required.' });
   }
 
+  const connection = await pool.getConnection();
   try {
-    const connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    try {
-      for (const rec of records) {
-        const sql = `
-          INSERT INTO attendance (student_id, class_section, date, status, marked_by)
-          VALUES (?, ?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE status = VALUES(status), marked_by = VALUES(marked_by), updated_at = CURRENT_TIMESTAMP
-        `;
-        await connection.query(sql, [
-          rec.studentId,
-          classSection,
-          date,
-          rec.status || 'Present',
-          markedBy || 'Teacher'
-        ]);
-      }
-
-      await connection.commit();
-      connection.release();
-
-      return res.status(200).json({
-        success: true,
-        message: `Attendance for ${classSection} on ${date} saved successfully (${records.length} records processed).`,
-        count: records.length
-      });
-    } catch (txErr) {
-      await connection.rollback();
-      connection.release();
-      throw txErr;
-    }
-  } catch (error) {
-    console.warn('[ATTENDANCE API] Database transaction failed, saving locally:', error.message);
-    
-    // Save to memory fallback
-    records.forEach(rec => {
-      const existingIdx = mockAttendance.findIndex(a => a.studentId === rec.studentId && a.date === date);
-      const entryObj = {
-        id: `att_${Date.now()}_${rec.studentId}`,
-        studentId: rec.studentId,
+    for (const rec of records) {
+      const sql = `
+        INSERT INTO attendance (student_id, class_section, date, status, marked_by)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE status = VALUES(status), marked_by = VALUES(marked_by), updated_at = CURRENT_TIMESTAMP
+      `;
+      await connection.query(sql, [
+        rec.studentId,
         classSection,
         date,
-        status: rec.status || 'Present',
-        markedBy: markedBy || 'Teacher'
-      };
+        rec.status || 'Present',
+        markedBy || 'Teacher'
+      ]);
+    }
 
-      if (existingIdx >= 0) {
-        mockAttendance[existingIdx] = entryObj;
-      } else {
-        mockAttendance.push(entryObj);
-      }
-    });
-
+    await connection.commit();
     return res.status(200).json({
       success: true,
-      isMock: true,
-      message: `Attendance for ${classSection} on ${date} saved locally (${records.length} records).`,
+      message: `Attendance for ${classSection} on ${date} saved successfully (${records.length} records processed).`,
       count: records.length
     });
+  } catch (error) {
+    await connection.rollback();
+    console.error('[ATTENDANCE API POST ERROR]:', error);
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
+  } finally {
+    connection.release();
   }
 });
 

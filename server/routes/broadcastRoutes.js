@@ -1,24 +1,12 @@
 import express from 'express';
 import pool from '../config/db.js';
+import { authenticateToken, requireSuperAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Fallback mock broadcast notes
-const mockBroadcasts = [
-  {
-    id: 'note_01',
-    title: 'Q3 System Policy & Mandatory Audit',
-    description: 'All School Administrators must verify student fee chalans, sync final marks, and ensure attendance records are locked before the term deadline.',
-    message: 'All School Administrators must verify student fee chalans, sync final marks, and ensure attendance records are locked before the term deadline.',
-    imageUrl: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
-    targetSchoolId: 'all',
-    sender: 'Alex Vance (Super Admin HQ)',
-    createdAt: '2026-08-27T10:00:00.000Z'
-  }
-];
-
-// GET /api/broadcasts — Fetch broadcast announcements / directives
+// ------------------------------------------------------------
+// GET /api/broadcasts — Fetch broadcast announcements / directives from MySQL
+// ------------------------------------------------------------
 router.get('/', async (req, res) => {
   const { targetSchoolId } = req.query;
   try {
@@ -45,17 +33,15 @@ router.get('/', async (req, res) => {
 
     return res.json({ success: true, count: formatted.length, data: formatted });
   } catch (error) {
-    console.warn('[BROADCASTS API] Database query failed, returning fallback memory data:', error.message);
-    let filtered = mockBroadcasts;
-    if (targetSchoolId && targetSchoolId !== 'all') {
-      filtered = mockBroadcasts.filter(b => b.targetSchoolId === 'all' || b.targetSchoolId === targetSchoolId);
-    }
-    return res.json({ success: true, isMock: true, count: filtered.length, data: filtered });
+    console.error('[BROADCASTS API ERROR]:', error);
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });
 
-// POST /api/broadcasts — Publish a new directive / broadcast note
-router.post('/', async (req, res) => {
+// ------------------------------------------------------------
+// POST /api/broadcasts — Publish a new directive / broadcast note to MySQL
+// ------------------------------------------------------------
+router.post('/', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const { title, description, message, imageUrl, videoUrl, targetSchoolId, sender } = req.body;
     const bodyContent = description || message;
@@ -64,52 +50,63 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Title and Description/Message are required.' });
     }
 
-    try {
-      const sql = `
-        INSERT INTO broadcasts (title, description, message, image_url, video_url, target_school_id, sender)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `;
-      const [result] = await pool.query(sql, [
-        title,
-        bodyContent,
-        bodyContent,
-        imageUrl || null,
-        videoUrl || null,
-        targetSchoolId || 'all',
-        sender || 'Super Admin'
-      ]);
+    const sql = `
+      INSERT INTO broadcasts (title, description, message, image_url, video_url, target_school_id, sender)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    const [result] = await pool.query(sql, [
+      title,
+      bodyContent,
+      bodyContent,
+      imageUrl || null,
+      videoUrl || null,
+      targetSchoolId || 'all',
+      sender || req.user?.name || 'Super Admin'
+    ]);
 
-      const newBroadcast = {
-        id: result.insertId,
-        title,
-        description: bodyContent,
-        message: bodyContent,
-        imageUrl,
-        videoUrl,
-        targetSchoolId: targetSchoolId || 'all',
-        sender: sender || 'Super Admin',
-        createdAt: new Date().toISOString()
-      };
+    const newBroadcast = {
+      id: result.insertId,
+      title,
+      description: bodyContent,
+      message: bodyContent,
+      imageUrl: imageUrl || null,
+      videoUrl: videoUrl || null,
+      targetSchoolId: targetSchoolId || 'all',
+      sender: sender || req.user?.name || 'Super Admin',
+      createdAt: new Date().toISOString()
+    };
 
-      return res.status(201).json({ success: true, message: 'Broadcast directive published successfully.', data: newBroadcast });
-    } catch (dbErr) {
-      console.warn('[BROADCASTS API] Database insert failed, publishing locally:', dbErr.message);
-      const newBroadcast = {
-        id: `note_${Date.now()}`,
-        title,
-        description: bodyContent,
-        message: bodyContent,
-        imageUrl,
-        videoUrl,
-        targetSchoolId: targetSchoolId || 'all',
-        sender: sender || 'Super Admin',
-        createdAt: new Date().toISOString()
-      };
-      mockBroadcasts.unshift(newBroadcast);
-      return res.status(201).json({ success: true, isMock: true, message: 'Broadcast directive published locally.', data: newBroadcast });
-    }
+    return res.status(201).json({ success: true, message: 'Broadcast directive published successfully.', data: newBroadcast });
   } catch (error) {
-    console.error('[BROADCASTS API FATAL]:', error);
+    console.error('[BROADCASTS API POST ERROR]:', error);
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
+  }
+});
+
+// ------------------------------------------------------------
+// DELETE /api/broadcasts/:id — Delete a broadcast directive from MySQL
+// ------------------------------------------------------------
+router.delete('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
+  const broadcastId = parseInt(req.params.id);
+
+  if (isNaN(broadcastId)) {
+    return res.status(400).json({ success: false, error: 'Validation Error', message: 'Invalid broadcast ID.' });
+  }
+
+  try {
+    const [existing] = await pool.query('SELECT id FROM broadcasts WHERE id = ?', [broadcastId]);
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'Broadcast directive not found.' });
+    }
+
+    await pool.query('DELETE FROM broadcasts WHERE id = ?', [broadcastId]);
+
+    return res.json({
+      success: true,
+      message: 'Broadcast directive deleted successfully.'
+    });
+  } catch (error) {
+    console.error('[BROADCASTS API DELETE ERROR]:', error);
     return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });

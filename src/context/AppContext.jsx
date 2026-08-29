@@ -1,11 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
 import {
-  MOCK_MARKS,
-  MOCK_CHALANS,
-  MOCK_REMINDERS,
-  MOCK_LECTURE_REGISTER
-} from '../utils/initialData';
-import {
   loginUser as loginUserApi,
   fetchMe as fetchMeApi,
   fetchUsers as fetchUsersApi,
@@ -17,30 +11,28 @@ import {
   deleteUser as deleteUserApi,
   deleteStudent as deleteStudentApi,
   updateProfile as updateProfileApi,
-  updatePassword as updatePasswordApi
+  updatePassword as updatePasswordApi,
+  fetchBroadcasts as fetchBroadcastsApi,
+  createBroadcast as createBroadcastApi,
+  deleteBroadcast as deleteBroadcastApi,
+  toggleSchoolStatus as toggleSchoolStatusApi
 } from '../services/api';
 
 // Safe localStorage helper — strips large base64 avatar before storing
 function safeStoreUser(user) {
   if (!user) return;
-  const lightweight = { ...user };
-  // Remove base64 blobs — avatar_url in DB is fetched fresh on login
-  if (lightweight.avatar && String(lightweight.avatar).startsWith('data:')) {
-    delete lightweight.avatar;
-  }
-  if (lightweight.avatar_url && String(lightweight.avatar_url).startsWith('data:')) {
-    delete lightweight.avatar_url;
-  }
+  const lightweight = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    school_id: user.school_id || user.schoolId || null
+  };
   try {
     localStorage.setItem('user', JSON.stringify(lightweight));
     localStorage.setItem('eduzenta_user', JSON.stringify(lightweight));
   } catch (e) {
-    // If still too large, store only essential fields
-    const minimal = { id: user.id, name: user.name, email: user.email, role: user.role, school_id: user.school_id };
-    try {
-      localStorage.setItem('user', JSON.stringify(minimal));
-      localStorage.setItem('eduzenta_user', JSON.stringify(minimal));
-    } catch (_) { /* ignore */ }
+    // Fallback ignored
   }
 }
 
@@ -73,8 +65,8 @@ export function AppProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [schools, setSchools] = useState([]);
   const [students, setStudents] = useState([]);
-  const [marks, setMarks] = useState(MOCK_MARKS);
-  const [chalans, setChalans] = useState(MOCK_CHALANS);
+  const [marks, setMarks] = useState([]);
+  const [chalans, setChalans] = useState([]);
   const [attendance, setAttendance] = useState([]);
 
   // Sanitize localStorage on first render to remove old base64 blobs
@@ -175,6 +167,24 @@ export function AppProvider({ children }) {
         } catch (err) {
           console.warn('[DB HYDRATION] fetchStudents failed:', err.message);
         }
+
+        // 5. Hydrate broadcast directives from MySQL DB
+        try {
+          const broadcastsRes = await fetchBroadcastsApi('all');
+          if (broadcastsRes?.data && Array.isArray(broadcastsRes.data)) {
+            setBroadcastNotes(broadcastsRes.data);
+          }
+        } catch (err) {
+          console.warn('[DB HYDRATION] fetchBroadcasts failed:', err.message);
+        }
+      } else {
+        // Unauthenticated visitor — still fetch public broadcasts
+        try {
+          const broadcastsRes = await fetchBroadcastsApi('all');
+          if (broadcastsRes?.data && Array.isArray(broadcastsRes.data)) {
+            setBroadcastNotes(broadcastsRes.data);
+          }
+        } catch (_) {}
       }
     }
 
@@ -182,36 +192,7 @@ export function AppProvider({ children }) {
   }, []);
 
   // Communication & Broadcast Notes State (Super Admin -> School Admins)
-  const [broadcastNotes, setBroadcastNotes] = useState(() => {
-    try {
-      const saved = localStorage.getItem('eduzenta_broadcast_notes');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return [
-      {
-        id: 'note_01',
-        title: 'Q3 System Policy & Mandatory Audit',
-        description: 'All School Administrators must verify student fee chalans, sync final marks, and ensure attendance records are locked before the term deadline.',
-        imageUrl: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=800&q=80',
-        videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
-        targetSchoolId: 'all',
-        targetSchoolName: 'All Registered Schools',
-        sender: 'Alex Vance (Super Admin HQ)',
-        createdAt: '2026-08-27T10:00:00.000Z',
-        isReadBy: []
-      }
-    ];
-  });
-
-  React.useEffect(() => {
-    try {
-      localStorage.setItem('eduzenta_broadcast_notes', JSON.stringify(broadcastNotes));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [broadcastNotes]);
+  const [broadcastNotes, setBroadcastNotes] = useState([]);
 
   // Create a new activity (subject/assessment) for a class/term
   const createActivity = (activity) => {
@@ -271,34 +252,11 @@ export function AppProvider({ children }) {
     });
     addToast('Activity Marks Updated', `Marks saved for activity ${activityId}.`, 'success');
   };
-  const [reminders, setReminders] = useState(MOCK_REMINDERS);
-  const [lectureRegister, setLectureRegister] = useState(MOCK_LECTURE_REGISTER);
+  const [reminders, setReminders] = useState([]);
+  const [lectureRegister, setLectureRegister] = useState([]);
 
   // Admit Cards State (Shared CRUD for Admin and Teacher)
-  const [admitCards, setAdmitCards] = useState([
-  {
-    id: "adm_01",
-    studentId: "SCH-2025-1001",
-    studentName: "Aiden Vance",
-    rollNo: "1001",
-    regNo: "REG-1001-A",
-    classSection: "Class 10-A",
-    examCenter: "Main Campus Block B (Hall A)",
-    term: "1st Term",
-    status: "Ready"
-  },
-  {
-    id: "adm_02",
-    studentId: "SCH-2025-1002",
-    studentName: "Sophia Martinez",
-    rollNo: "1002",
-    regNo: "REG-1002-B",
-    classSection: "Class 10-A",
-    examCenter: "Main Campus Block B (Hall A)",
-    term: "1st Term",
-    status: "Ready"
-  }
-]);
+  const [admitCards, setAdmitCards] = useState([]);
 
   // ====================
   // Attendance Management (Admin Override)
@@ -525,26 +483,44 @@ export function AppProvider({ children }) {
     addToast('Activity Deleted', 'Activity removed successfully.', 'warning');
   };
 
-  const createBroadcastNote = (noteData) => {
-    const newNote = {
-      id: `note_${Date.now()}`,
-      title: noteData.title,
-      description: noteData.description,
-      imageUrl: noteData.imageUrl || '',
-      videoUrl: noteData.videoUrl || '',
-      targetSchoolId: noteData.targetSchoolId || 'all',
-      targetSchoolName: noteData.targetSchoolName || 'All Registered Schools',
-      sender: `${currentUser?.name || 'Super Admin'} (Super Admin HQ)`,
-      createdAt: new Date().toISOString(),
-      isReadBy: []
-    };
-    setBroadcastNotes(prev => [newNote, ...prev]);
-    addToast('Broadcast Note Sent', `Directive "${newNote.title}" published to school admins.`, 'success');
+  const createBroadcastNote = async (noteData) => {
+    try {
+      const res = await createBroadcastApi({
+        title: noteData.title,
+        description: noteData.description || noteData.message,
+        imageUrl: noteData.imageUrl || null,
+        videoUrl: noteData.videoUrl || null,
+        targetSchoolId: noteData.targetSchoolId || 'all',
+        sender: noteData.sender || `${currentUser?.name || 'Super Admin'} (Super Admin HQ)`
+      });
+      if (res?.data) {
+        setBroadcastNotes(prev => [res.data, ...prev]);
+        addToast('Broadcast Note Sent', `Directive "${noteData.title}" published to database.`, 'success');
+        return { success: true, data: res.data };
+      }
+    } catch (err) {
+      console.error('[CREATE BROADCAST NOTE ERROR]:', err);
+      addToast('Broadcast Failed', err.message || 'Failed to save broadcast note in database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
-  const deleteBroadcastNote = (noteId) => {
-    setBroadcastNotes(prev => prev.filter(n => n.id !== noteId));
-    addToast('Directive Deleted', 'Broadcast note removed.', 'warning');
+  const deleteBroadcastNote = async (noteId) => {
+    const numericId = parseInt(String(noteId).replace(/\D/g, ''));
+    try {
+      if (!isNaN(numericId) && numericId > 0) {
+        await deleteBroadcastApi(numericId);
+      } else {
+        await deleteBroadcastApi(noteId);
+      }
+      setBroadcastNotes(prev => prev.filter(n => String(n.id) !== String(noteId) && String(n.id) !== String(numericId)));
+      addToast('Directive Deleted', 'Broadcast note deleted from database.', 'warning');
+      return { success: true };
+    } catch (err) {
+      console.error('[DELETE BROADCAST NOTE ERROR]:', err);
+      addToast('Deletion Failed', err.message || 'Failed to delete broadcast note from database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   const markNoteAsRead = (noteId) => {
@@ -558,9 +534,6 @@ export function AppProvider({ children }) {
       return n;
     }));
   };
-
-    
-  
 
   // Toast Notification Queue
   const [toasts, setToasts] = useState([]);
@@ -620,6 +593,14 @@ export function AppProvider({ children }) {
       }
       return { success: false, error: apiRes?.message || 'Login failed.' };
     } catch (err) {
+      if (err.code === 'ACCOUNT_LOCKED' || (err.message && err.message.includes('Account locked'))) {
+        setLockedModal({
+          open: true,
+          email,
+          message: err.message || 'Your school account is currently locked because of pending payment. Please contact your School Administrator or Super Admin.'
+        });
+        return { success: false, locked: true, error: err.message || 'Account Locked — Pending Payment' };
+      }
       return { success: false, error: err.message || 'Invalid email or password.' };
     }
   };
@@ -634,30 +615,56 @@ export function AppProvider({ children }) {
     addToast('Logged Out', 'You have been safely signed out of Eduzenta.', 'info');
   };
 
-  // Super Admin actions
-  const toggleSchoolLockout = (schoolId) => {
-    setSchools(prev => prev.map(s => {
-      if (s.id === schoolId) {
-        const isCurrentlyLocked = s.status.includes('Locked');
-        const newStatus = isCurrentlyLocked ? 'Active' : 'Locked - Pending Payment';
+  // Super Admin actions: Toggle School Lockout
+  const toggleSchoolLockout = async (schoolId) => {
+    const targetSchool = schools.find(s => String(s.id) === String(schoolId));
+    const currentStatus = targetSchool?.status || 'Active';
+    const isCurrentlyLocked = String(currentStatus).toLowerCase().includes('lock');
+    const newStatus = isCurrentlyLocked ? 'Active' : 'Locked';
 
-        setUsers(uPrev => uPrev.map(u => {
-          if (u.schoolId === schoolId || u.email === s.adminEmail) {
-            return { ...u, locked: !isCurrentlyLocked };
-          }
-          return u;
-        }));
+    try {
+      await toggleSchoolStatusApi(schoolId, newStatus);
+      setSchools(prev => prev.map(s => String(s.id) === String(schoolId) ? { ...s, status: newStatus } : s));
+      setUsers(uPrev => uPrev.map(u => {
+        if (String(u.schoolId) === String(schoolId) || String(u.school_id) === String(schoolId)) {
+          return { ...u, locked: !isCurrentlyLocked };
+        }
+        return u;
+      }));
+      addToast(
+        'Lock status updated',
+        `School status set to "${newStatus}" in MySQL database.`,
+        isCurrentlyLocked ? 'success' : 'warning'
+      );
+    } catch (err) {
+      console.error('[TOGGLE SCHOOL LOCK ERROR]:', err);
+      addToast('Status Update Failed', err.message || 'Failed to update school status in database.', 'warning');
+    }
+  };
 
-        addToast(
-          'Lock status updated',
-          `${s.name} status set to "${newStatus}".`,
-          isCurrentlyLocked ? 'success' : 'warning'
-        );
-
-        return { ...s, status: newStatus };
+  // Super Admin Reset Password for School Admin
+  const resetAdminPassword = async (userId, newPassword) => {
+    const numericId = parseInt(String(userId).replace(/\D/g, ''));
+    if (isNaN(numericId) || numericId <= 0) {
+      addToast('Validation Error', 'Invalid numeric database user ID.', 'warning');
+      return { success: false, error: 'Invalid numeric database user ID.' };
+    }
+    if (!newPassword || newPassword.length < 6) {
+      addToast('Validation Error', 'Password must be at least 6 characters.', 'warning');
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+    try {
+      const res = await updateUserApi(numericId, { password: newPassword });
+      if (res?.user || res?.success) {
+        addToast('Password Reset', `Password updated successfully in database.`, 'success');
+        return { success: true };
       }
-      return s;
-    }));
+      throw new Error(res?.message || 'Failed to reset password.');
+    } catch (err) {
+      console.error('[RESET ADMIN PASSWORD ERROR]:', err);
+      addToast('Password Reset Failed', err.message || 'Failed to reset password in database.', 'warning');
+      return { success: false, error: err.message };
+    }
   };
 
   // Onboard School Admin — uses real DB IDs returned from API (called after createSchoolAdminApi succeeds)
@@ -697,18 +704,27 @@ export function AppProvider({ children }) {
 
     try {
       if (!isNaN(numericId) && numericId > 0) {
-        const res = await updateUserApi(numericId, {
+        const payload = {
           name: cleanName,
           school_name: updatedFields.schoolName
-        });
+        };
+        if (updatedFields.email) payload.email = updatedFields.email;
+        if (updatedFields.password) payload.password = updatedFields.password;
+
+        const res = await updateUserApi(numericId, payload);
         if (res?.user) {
-          setUsers(prev => prev.map(u => (u.id === userId || u.id === numericId) ? { ...u, ...updatedFields, name: res.user.name } : u));
+          setUsers(prev => prev.map(u => (u.id === userId || u.id === numericId) ? {
+            ...u,
+            ...updatedFields,
+            name: res.user.name,
+            email: res.user.email
+          } : u));
           if (res.user.school_name) {
             setSchools(prev => prev.map(s => (s.id === res.user.school_id) ? { ...s, name: res.user.school_name } : s));
           }
         }
       } else {
-        setUsers(prev => prev.map(u => (u.id === userId) ? { ...u, ...updatedFields, email: u.email } : u));
+        setUsers(prev => prev.map(u => (u.id === userId) ? { ...u, ...updatedFields } : u));
       }
       addToast('Account Updated', 'School Admin profile updated in database.', 'success');
       return { success: true };
@@ -1070,6 +1086,7 @@ export function AppProvider({ children }) {
         broadcastReminder,
         updateProfileInfo,
         resetPasswordSimple,
+        resetAdminPassword,
         createActivity,
         updateStudentMarksForActivity,
         // Attendance admin helpers & overrides

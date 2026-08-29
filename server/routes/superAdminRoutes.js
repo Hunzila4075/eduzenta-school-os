@@ -95,12 +95,48 @@ router.get('/schools', authenticateToken, requireSuperAdmin, async (req, res) =>
     const [schools] = await pool.query(
       `SELECT s.id, s.name, s.status, s.created_at, u.email as admin_email, u.name as admin_name 
        FROM schools s 
-       LEFT JOIN users u ON u.school_id = s.id AND u.role = 'admin'
+       LEFT JOIN users u ON u.school_id = s.id AND (u.role = 'admin' OR u.role = 'school_admin')
        ORDER BY s.id DESC`
     );
     return res.json({ success: true, schools });
   } catch (error) {
     console.error('[GET SCHOOLS ERROR]:', error);
+    return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
+  }
+});
+
+// ------------------------------------------------------------
+// PUT /api/superadmin/schools/:id/status — Toggle/Update School Status (Lock/Unlock)
+// ------------------------------------------------------------
+router.put('/schools/:id/status', authenticateToken, requireSuperAdmin, async (req, res) => {
+  const schoolId = parseInt(req.params.id);
+  const { status } = req.body;
+
+  if (isNaN(schoolId)) {
+    return res.status(400).json({ success: false, error: 'Validation Error', message: 'Invalid school ID.' });
+  }
+
+  if (!status) {
+    return res.status(400).json({ success: false, error: 'Validation Error', message: 'Status is required.' });
+  }
+
+  try {
+    const [existing] = await pool.query('SELECT id, name, status FROM schools WHERE id = ?', [schoolId]);
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'School record not found.' });
+    }
+
+    await pool.query('UPDATE schools SET status = ? WHERE id = ?', [status, schoolId]);
+
+    const [updatedRows] = await pool.query('SELECT id, name, status, created_at FROM schools WHERE id = ?', [schoolId]);
+
+    return res.json({
+      success: true,
+      message: `School status updated to ${status} in MySQL database.`,
+      school: updatedRows[0]
+    });
+  } catch (error) {
+    console.error('[UPDATE SCHOOL STATUS ERROR]:', error);
     return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
   }
 });

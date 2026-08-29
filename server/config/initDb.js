@@ -12,10 +12,19 @@ export async function initializeDatabase() {
         CREATE TABLE IF NOT EXISTS \`schools\` (
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
           \`name\` VARCHAR(255) NOT NULL,
-          \`status\` ENUM('Active', 'Inactive', 'Locked') DEFAULT 'Active',
+          \`status\` VARCHAR(50) DEFAULT 'Active',
           \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
       `);
+
+      // Ensure status column allows flexible status strings
+      try {
+        await connection.query(`
+          ALTER TABLE \`schools\` MODIFY COLUMN \`status\` VARCHAR(50) DEFAULT 'Active';
+        `);
+      } catch (err) {
+        // Ignore if alter fails
+      }
 
       // 2. Create USERS table
       await connection.query(`

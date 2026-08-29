@@ -120,6 +120,9 @@ export default function AdminManagement() {
   };
 
 
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+
   const handleEditOpen = (user) => {
     setEditingUserId(user.id);
     const parts = (user.name || '').split(' ');
@@ -129,6 +132,8 @@ export default function AdminManagement() {
     setSchoolName(user.schoolName);
     const sch = schools.find(s => s.id === user.schoolId);
     setSchoolLogoUrl(sch?.logoUrl || user.schoolLogoUrl || '');
+    setNewAdminPassword('');
+    setShowPasswordReset(false);
     setIsEditModalOpen(true);
   };
 
@@ -136,15 +141,22 @@ export default function AdminManagement() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await updateSchoolAdmin(editingUserId, {
+      const updatePayload = {
         firstName,
         lastName,
-        name: `${firstName} ${lastName}`,
+        name: `${firstName} ${lastName}`.trim(),
+        email,
         schoolName,
         schoolLogoUrl
-      });
+      };
+      if (newAdminPassword.trim()) {
+        updatePayload.password = newAdminPassword.trim();
+      }
+      await updateSchoolAdmin(editingUserId, updatePayload);
       setIsEditModalOpen(false);
       resetForm();
+      setNewAdminPassword('');
+      setShowPasswordReset(false);
     } catch (err) {
       console.error('[EDIT ADMIN ERROR]:', err);
     } finally {
@@ -491,16 +503,46 @@ export default function AdminManagement() {
             </div>
 
             <div>
-              <label htmlFor="edit-admin-email" className="block text-xs font-bold text-slate-700 mb-1">Assigned Email (Immutable)</label>
+              <label htmlFor="edit-admin-email" className="block text-xs font-bold text-slate-700 mb-1">Assigned Email</label>
               <input
                 id="edit-admin-email"
                 name="email"
-                type="text"
-                disabled
+                type="email"
+                required
                 autoComplete="email"
                 value={email}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-100 font-mono text-slate-500"
+                onChange={e => setEmail(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono text-slate-900 focus:ring-2 focus:ring-purple-500"
               />
+            </div>
+
+            {/* RESET ADMIN PASSWORD SECTION */}
+            <div className="pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowPasswordReset(!showPasswordReset)}
+                className="text-xs font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1.5 min-h-[36px]"
+              >
+                <span>🔑 {showPasswordReset ? 'Cancel Password Reset' : 'Reset Admin Password'}</span>
+              </button>
+              {showPasswordReset && (
+                <div className="mt-2 p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-2">
+                  <label htmlFor="reset-admin-pwd" className="block text-[11px] font-bold text-purple-900">
+                    New Admin Password (min 6 characters)
+                  </label>
+                  <input
+                    id="reset-admin-pwd"
+                    type="password"
+                    value={newAdminPassword}
+                    onChange={e => setNewAdminPassword(e.target.value)}
+                    placeholder="Enter new password (hashed with bcrypt on save)"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-purple-300 font-mono bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <span className="text-[10px] text-purple-700 block font-medium">
+                    ✓ Password will be securely hashed with bcrypt in MySQL.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

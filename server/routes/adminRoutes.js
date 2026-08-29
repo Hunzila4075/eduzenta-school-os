@@ -161,7 +161,7 @@ router.get('/users', authenticateToken, requireSchoolAdmin, async (req, res) => 
 // ------------------------------------------------------------
 router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const { name, school_name, schoolName, avatar, avatar_url } = req.body;
+  const { name, email, school_name, schoolName, avatar, avatar_url, password, new_password, newPassword, is_active, isActive } = req.body;
 
   if (isNaN(userId)) {
     return res.status(400).json({
@@ -172,8 +172,10 @@ router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res)
   }
 
   const cleanName = name ? String(name).trim() : null;
+  const cleanEmail = email ? String(email).trim().toLowerCase() : null;
   const targetSchoolName = (school_name || schoolName) ? String(school_name || schoolName).trim() : null;
   const targetAvatar = avatar || avatar_url || null;
+  const targetPassword = password || new_password || newPassword || null;
 
   try {
     const [existing] = await pool.query('SELECT id, school_id, name, email, role FROM users WHERE id = ?', [userId]);
@@ -187,19 +189,54 @@ router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res)
       });
     }
 
-    // Update user record if name or avatar provided
-    if (cleanName && targetAvatar) {
-      await pool.query('UPDATE users SET name = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [cleanName, targetAvatar, userId]);
-    } else if (cleanName) {
-      await pool.query('UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [cleanName, userId]);
-    } else if (targetAvatar) {
-      await pool.query('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [targetAvatar, userId]);
+    // Check email uniqueness if email is being updated
+    if (cleanEmail && cleanEmail !== user.email) {
+      const [emailConflict] = await pool.query('SELECT id FROM users WHERE email = ? AND id != ?', [cleanEmail, userId]);
+      if (emailConflict && emailConflict.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'Conflict Error',
+          message: 'This email address is already in use by another user.'
+        });
+      }
+      await pool.query('UPDATE users SET email = ? WHERE id = ?', [cleanEmail, userId]);
+    }
+
+    // Update name
+    if (cleanName) {
+      await pool.query('UPDATE users SET name = ? WHERE id = ?', [cleanName, userId]);
+    }
+
+    // Update avatar
+    if (targetAvatar) {
+      await pool.query('UPDATE users SET avatar_url = ? WHERE id = ?', [targetAvatar, userId]);
+    }
+
+    // Update active status
+    if (is_active !== undefined || isActive !== undefined) {
+      const activeState = (is_active !== undefined) ? (is_active ? 1 : 0) : (isActive ? 1 : 0);
+      await pool.query('UPDATE users SET is_active = ? WHERE id = ?', [activeState, userId]);
+    }
+
+    // Secure Password Reset by Super Admin / School Admin
+    if (targetPassword) {
+      if (String(targetPassword).length < 6) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation Error',
+          message: 'Password must be at least 6 characters.'
+        });
+      }
+      const hashedPassword = await bcrypt.hash(String(targetPassword), 10);
+      await pool.query('UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [hashedPassword, userId]);
     }
 
     // Update school name if school_id exists and school_name provided
     if (targetSchoolName && user.school_id) {
       await pool.query('UPDATE schools SET name = ? WHERE id = ?', [targetSchoolName, user.school_id]);
     }
+
+    await pool.query('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
 
     const [updatedRows] = await pool.query(
       `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, s.name as school_name 

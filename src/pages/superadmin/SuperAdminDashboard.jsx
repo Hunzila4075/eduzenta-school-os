@@ -80,8 +80,7 @@ export default function SuperAdminDashboard() {
     const r = String(u.role || '').toLowerCase();
     return r === 'admin' || r === 'school_admin' || r === 'school-admin';
   }).length;
-  const totalRevenue = schools.reduce((acc, s) => acc + (Number(s.monthlyRevenue) || Number(s.monthly_revenue) || 1500), 0);
-
+  const totalRevenue = schools.reduce((acc, s) => acc + (Number(s.monthlyRevenue) || Number(s.monthly_revenue) || 0), 0);
 
   const handleImageFileChange = (e) => {
     const file = e.target.files[0];
@@ -101,35 +100,23 @@ export default function SuperAdminDashboard() {
     const targetSchool = schools.find(s => s.id === targetSchoolId);
     const targetName = targetSchoolId === 'all' ? 'All Registered Schools' : (targetSchool?.name || 'Selected School');
 
-    // Save to AppContext (local state + localStorage)
-    createBroadcastNote({
-      title: noteTitle,
-      description: noteDescription,
-      imageUrl,
-      videoUrl,
-      targetSchoolId,
-      targetSchoolName: targetName
-    });
-
-    // Also try to persist to MySQL via API
     setIsSendingBroadcast(true);
     setBroadcastApiError(null);
+
     try {
-      const response = await apiCreateBroadcast({
+      const res = await createBroadcastNote({
         title: noteTitle,
         description: noteDescription,
         imageUrl: imageUrl || null,
         videoUrl: videoUrl || null,
         targetSchoolId,
-        sender: 'Super Admin'
+        targetSchoolName: targetName
       });
-      if (response?.success && response.data) {
-        setIsApiConnected(!response.isMock);
-        // Prepend new broadcast to API list
-        setApiBroadcasts(prev => prev !== null ? [response.data, ...prev] : null);
+      if (res?.data && apiBroadcasts !== null) {
+        setApiBroadcasts(prev => [res.data, ...prev]);
       }
-    } catch (_) {
-      setBroadcastApiError('Saved locally — API sync failed.');
+    } catch (err) {
+      setBroadcastApiError(err.message || 'Failed to send broadcast.');
     } finally {
       setIsSendingBroadcast(false);
     }
@@ -337,7 +324,12 @@ export default function SuperAdminDashboard() {
                   <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium pt-2 border-t border-slate-200">
                     <span>Sent: {new Date(note.createdAt).toLocaleDateString()}</span>
                     <button
-                      onClick={() => deleteBroadcastNote(note.id)}
+                      onClick={async () => {
+                        await deleteBroadcastNote(note.id);
+                        if (apiBroadcasts !== null) {
+                          setApiBroadcasts(prev => prev ? prev.filter(b => String(b.id) !== String(note.id)) : []);
+                        }
+                      }}
                       className="text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

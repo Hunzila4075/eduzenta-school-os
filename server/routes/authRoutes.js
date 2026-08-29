@@ -57,6 +57,21 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // School Account Lock Check (only affects non-superadmin users)
+    const userRoleStr = String(user.role || '').toLowerCase();
+    if (userRoleStr !== 'super_admin' && userRoleStr !== 'superadmin' && user.school_id) {
+      const [schoolRows] = await pool.query('SELECT status FROM schools WHERE id = ?', [user.school_id]);
+      const targetSchool = schoolRows[0];
+      if (targetSchool && targetSchool.status && String(targetSchool.status).toLowerCase().includes('lock')) {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_LOCKED',
+          error: 'Account Locked',
+          message: 'Account locked due to pending payment'
+        });
+      }
+    }
+
     const token = jwt.sign(
       {
         id: user.id,
@@ -125,6 +140,20 @@ router.get('/me', authenticateToken, async (req, res) => {
         error: 'Account Locked',
         message: 'This account has been deactivated.'
       });
+    }
+
+    const userRoleStr = String(user.role || '').toLowerCase();
+    if (userRoleStr !== 'super_admin' && userRoleStr !== 'superadmin' && user.school_id) {
+      const [schoolRows] = await pool.query('SELECT status FROM schools WHERE id = ?', [user.school_id]);
+      const targetSchool = schoolRows[0];
+      if (targetSchool && targetSchool.status && String(targetSchool.status).toLowerCase().includes('lock')) {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_LOCKED',
+          error: 'Account Locked',
+          message: 'Account locked due to pending payment'
+        });
+      }
     }
 
     return res.json({
