@@ -1,25 +1,26 @@
 import React from 'react';
-import EduzentaLogo from '../common/EduzentaLogo';
 import { Scissors, CreditCard, Building2, Smartphone, CheckCircle2 } from 'lucide-react';
 
 export default function FeeChalanTemplate({ chalan, schoolInfo }) {
-  const schoolName = schoolInfo?.name || chalan?.schoolName || "Eduzenta School";
-  const schoolLogo = schoolInfo?.logoUrl || schoolInfo?.logo_url || "";
+  // CORE RULE 2 — branding from schoolInfo only, no hardcoded fallbacks
+  const schoolName = schoolInfo?.name || chalan?.schoolInfo?.name || '';
+  const schoolLogo = schoolInfo?.logoUrl || schoolInfo?.logo_url || chalan?.schoolInfo?.logoUrl || '';
+  const schoolAddress = schoolInfo?.address || chalan?.schoolInfo?.address || '';
 
   const isPaid = chalan?.status === 'Paid';
 
-  const parts = [
-    { title: "STUDENT COPY", bg: "bg-[#5A3193]", borderStyle: "border-r-2 border-dashed border-slate-400 pr-4" },
-    { title: "INSTITUTE COPY", bg: "bg-slate-900", borderStyle: "pl-4" }
+    const parts = [
+    { title: "STUDENT COPY", borderStyle: "border-r-2 border-dashed border-slate-400 pr-4" },
+    { title: "INSTITUTE COPY", borderStyle: "pl-4" }
   ];
 
   const items = [
-    { sr: 1, desc: "Tuition Fee", amount: chalan?.tuitionFee || 8000 },
-    { sr: 2, desc: "Development Fee", amount: chalan?.developmentFee || 1500 },
-    { sr: 3, desc: "Examination Fee", amount: chalan?.examFee || 1000 },
-    { sr: 4, desc: "Library Fee", amount: chalan?.libraryFee || 500 },
-    { sr: 5, desc: "Computer Lab Fee", amount: chalan?.computerFee || 500 },
-    { sr: 6, desc: "Co-Curricular Activity Fee", amount: chalan?.activityFee || 500 },
+        { sr: 1, desc: "Tuition Fee", amount: chalan?.tuitionFee || 0 },
+    { sr: 2, desc: "Development Fee", amount: chalan?.developmentFee || 0 },
+    { sr: 3, desc: "Examination Fee", amount: chalan?.examFee || 0 },
+    { sr: 4, desc: "Library Fee", amount: chalan?.libraryFee || 0 },
+    { sr: 5, desc: "Computer Lab Fee", amount: chalan?.computerFee || 0 },
+    { sr: 6, desc: "Co-Curricular Activity Fee", amount: chalan?.activityFee || 0 },
   ];
 
   if (chalan?.prevBalance > 0) {
@@ -32,7 +33,7 @@ export default function FeeChalanTemplate({ chalan, schoolInfo }) {
     items.push({ sr: items.length + 1, desc: "Scholarship Concession", amount: -chalan.discounts });
   }
 
-  const totalPayable = chalan?.totalAmount || 12000;
+    const totalPayable = chalan?.totalAmount || 0;
 
   return (
     <div className="bg-white p-4 text-slate-900 w-full max-w-[1100px] mx-auto page-break-card font-sans select-none leading-tight border border-slate-300 shadow-none">
@@ -42,7 +43,7 @@ export default function FeeChalanTemplate({ chalan, schoolInfo }) {
           <div key={pIdx} className={`flex flex-col justify-between min-h-[580px] ${part.borderStyle}`}>
             <div>
               {/* Top Branding Bar */}
-              <div className="flex items-center justify-between border-b-2 border-[#5A3193] pb-2 mb-2">
+              <div className="flex items-center justify-between border-b-2 border-slate-900 pb-2 mb-2">
                 <div className="flex items-center gap-2">
                   {schoolLogo ? (
                     <img
@@ -51,22 +52,22 @@ export default function FeeChalanTemplate({ chalan, schoolInfo }) {
                       className="w-10 h-10 rounded-md object-cover border border-slate-300 p-0.5 shrink-0 bg-white"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-md bg-[#5A3193] text-white font-black text-base flex items-center justify-center border border-purple-400 shrink-0">
-                      {(schoolName || 'E').charAt(0).toUpperCase()}
+                    <div className="w-10 h-10 rounded-md bg-slate-100 border border-slate-300 text-slate-400 font-black text-lg flex items-center justify-center shrink-0">
+                      {(schoolName || 'S').charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div>
-                    <h2 className="text-xs font-black uppercase text-[#2d1a4e] tracking-tight truncate max-w-[200px]">{schoolName}</h2>
-                    <p className="text-[9px] font-extrabold text-[#5A3193] uppercase">FEE CHALLAN • {chalan?.term || "1st Term"}</p>
+                    <h2 className="text-xs font-black uppercase text-slate-900 tracking-tight truncate max-w-[200px]">{schoolName || 'Educational Institution'}</h2>
+                    <p className="text-[9px] font-extrabold text-blue-900 uppercase">FEE CHALLAN • {chalan?.term || '1st Term'}</p>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className={`px-2 py-0.5 ${part.bg} text-white text-[9px] font-black uppercase tracking-wider rounded-xs`}>
+                  <span className="px-2 py-0.5 bg-blue-900 text-white text-[9px] font-black uppercase tracking-wider rounded-xs">
                     {part.title}
                   </span>
                   <p className="text-[9.5px] font-mono font-bold text-slate-800 mt-0.5">
-                    No: <strong className="text-[#5A3193]">{chalan?.chalanId || "CHL-2025-08-1001"}</strong>
+                    No: <strong className="text-blue-900">{chalan?.chalanId || chalan?.id || '—'}</strong>
                   </p>
                 </div>
               </div>
@@ -74,24 +75,24 @@ export default function FeeChalanTemplate({ chalan, schoolInfo }) {
               {/* Row 1 - Student Info Box */}
               <div className="border border-slate-800 bg-slate-50/80 p-2 text-[10px] rounded-xs mb-2">
                 <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                  <div><span className="text-slate-500 font-semibold">Student Name:</span> <strong className="text-slate-900">{chalan?.studentName || "Aiden Vance"}</strong></div>
-                  <div><span className="text-slate-500 font-semibold">Admission / Reg No:</span> <strong className="text-slate-800">{chalan?.regNo || "REG-1001-A"}</strong></div>
-                  <div><span className="text-slate-500 font-semibold">Class / Section:</span> <strong className="text-slate-900">{chalan?.classSection || "Class 10-A"}</strong></div>
-                  <div><span className="text-slate-500 font-semibold">Roll No:</span> <strong className="text-slate-900">{chalan?.rollNo || "1001"}</strong></div>
-                  <div><span className="text-slate-500 font-semibold">Father's Name:</span> <span className="font-semibold text-slate-800">David Vance</span></div>
-                  <div><span className="text-slate-500 font-semibold">Contact No:</span> <span className="font-mono text-slate-800">+1 (555) 234-5678</span></div>
+                  <div><span className="text-slate-500 font-semibold">Student Name:</span> <strong className="text-slate-900">{chalan?.studentName || "—"}</strong></div>
+                  <div><span className="text-slate-500 font-semibold">Admission / Reg No:</span> <strong className="text-slate-800">{chalan?.regNo || "—"}</strong></div>
+                  <div><span className="text-slate-500 font-semibold">Class / Section:</span> <strong className="text-slate-900">{chalan?.classSection || "—"}</strong></div>
+                  <div><span className="text-slate-500 font-semibold">Roll No:</span> <strong className="text-slate-900">{chalan?.rollNo || "—"}</strong></div>
+                  <div><span className="text-slate-500 font-semibold">Father's Name:</span> <span className="font-semibold text-slate-800">{chalan?.guardianName || '—'}</span></div>
+                  <div><span className="text-slate-500 font-semibold">Contact No:</span> <span className="font-mono text-slate-800">{chalan?.phone || "—"}</span></div>
                 </div>
               </div>
 
               {/* Row 2 - Academic Info Box & Due Date Badge */}
               <div className="border border-slate-800 bg-purple-50/50 p-2 text-[10px] rounded-xs mb-2 flex items-center justify-between">
                 <div>
-                  <span className="text-slate-600 font-semibold">Academic Session:</span> <strong className="text-slate-900">2024–2025</strong>
-                  <span className="ml-3 text-slate-600 font-semibold">Fee Month:</span> <strong className="text-[#5A3193]">{chalan?.monthYear || "August 2025"}</strong>
+                  <span className="text-slate-600 font-semibold">Academic Session:</span> <strong className="text-slate-900">{chalan?.session || "—"}</strong>
+                  <span className="ml-3 text-slate-600 font-semibold">Fee Month:</span> <strong className="text-[#5A3193]">{chalan?.monthYear || "—"}</strong>
                 </div>
                 <div className="flex items-center gap-1.5 bg-rose-600 text-white px-2.5 py-0.5 rounded-full text-[9.5px] font-black uppercase shadow-xs">
                   <span>PAYMENT DUE DATE:</span>
-                  <span className="font-mono">{chalan?.dueDate || "2025-08-10"}</span>
+                  <span className="font-mono">{chalan?.dueDate || "—"}</span>
                 </div>
               </div>
 
@@ -170,15 +171,15 @@ export default function FeeChalanTemplate({ chalan, schoolInfo }) {
                 </div>
               </div>
 
-              {/* Tagline Strip */}
-              <div className="bg-[#5A3193] text-white p-1 text-center text-[7.5px] font-bold tracking-wide rounded-xs mb-1">
-                Thank you for being a part of Eduzenta. • This is a computer generated challan and does not require any signature.
+                            {/* Tagline Strip */}
+              <div className="bg-blue-900 text-white p-1 text-center text-[7.5px] font-bold tracking-wide rounded-xs mb-1">
+                Thank you for choosing our educational institution. • This is a computer generated challan.
               </div>
 
-              {/* MANDATORY 2-LINE DOCUMENT FOOTER */}
+              {/* Document Footer */}
               <div className="border-t border-slate-300 pt-1 text-[7.5px] text-slate-600 leading-tight">
-                <div>Noted : Errors/Omissions Expected. Any mistake must be intimated within 30 days of the issuance of this result. official Result Card.</div>
-                <div className="font-extrabold text-[#5A3193] mt-0.5">Result generated with Eduzenta</div>
+                <div>Note: Errors/Omissions Expected. Any mistake must be intimated within 30 days of issuance.</div>
+                <div className="font-extrabold text-blue-900 mt-0.5">Eduzenta School OS Generated Official Document</div>
               </div>
             </div>
           </div>

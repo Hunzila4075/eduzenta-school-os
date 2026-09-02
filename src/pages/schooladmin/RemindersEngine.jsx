@@ -29,7 +29,7 @@ export default function RemindersEngine() {
   );
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
       <main className="flex-1 w-full min-w-0 overflow-x-hidden p-4 md:p-8">
@@ -42,7 +42,7 @@ export default function RemindersEngine() {
 
         {/* Super Admin Directives Section */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
               <Megaphone className="w-5 h-5 text-purple-600" />
               Incoming Super Admin Directives & Policy Notes

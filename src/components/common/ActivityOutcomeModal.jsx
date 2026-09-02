@@ -26,7 +26,7 @@ export default function ActivityOutcomeModal({ isOpen, onClose, activityId }) {
         (m) => m.studentId === student.id && m.term === activity.term
       );
       const subjectEntry = existing?.subjects?.find(
-        (sub) => sub.name === activity.subject
+        (sub) => (sub.subject || sub.name) === activity.subject
       );
       return {
         studentId: student.id,
@@ -46,30 +46,32 @@ export default function ActivityOutcomeModal({ isOpen, onClose, activityId }) {
     });
   };
 
-  const handleSaveMarks = () => {
+  const handleSaveMarks = async () => {
     const marksArray = studentMarks.map((s) => ({
       studentId: s.studentId,
       obtainedMarks: Number(s.obtainedMarks),
       remarks: s.remarks
     }));
-    updateStudentMarksForActivity(activityId, marksArray);
-    onClose();
+    // Await the persistence round-trip (POST /api/marks per student) so the
+    // modal only closes once the marks are actually stored in the database.
+    const result = await updateStudentMarksForActivity(activityId, marksArray);
+    if (result?.success) onClose();
   };
 
-  const handleUpdateActivityMeta = (e) => {
+  const handleUpdateActivityMeta = async (e) => {
     e.preventDefault();
-    updateActivity(activityId, {
+    const result = await updateActivity(activityId, {
       name: editMeta.name,
       subject: editMeta.subject,
       maxMarks: Number(editMeta.maxMarks)
     });
-    setIsEditing(false);
+    if (result?.success) setIsEditing(false);
   };
 
-  const handleDeleteActivity = () => {
+  const handleDeleteActivity = async () => {
     if (window.confirm(`Are you sure you want to delete activity "${activity.name}"?`)) {
-      deleteActivity(activityId);
-      onClose();
+      const result = await deleteActivity(activityId);
+      if (result?.success) onClose();
     }
   };
 

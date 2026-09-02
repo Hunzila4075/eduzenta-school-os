@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import DataTable from '../../components/common/DataTable';
@@ -11,8 +11,9 @@ export default function FeeManagement() {
   const {
     chalans,
     students,
+    schoolClasses,
     currentUser,
-    schools,
+    currentSchool,
     createFeeChalan,
     deleteFeeChalan,
     updateFeeStatus,
@@ -20,12 +21,10 @@ export default function FeeManagement() {
     autoGenerateMonthlyChalans
   } = useApp();
 
-  const currentSchool = schools.find(s => String(s.id) === String(currentUser?.schoolId || currentUser?.school_id)) || schools[0];
-
   const schoolInfo = {
-    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || "Eduzenta School",
+    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || "",
     logoUrl: currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || "",
-    address: currentSchool?.address || "Education Boulevard, Knowledge City"
+    address: currentSchool?.address || ""
   };
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -37,7 +36,7 @@ export default function FeeManagement() {
   const [editChalan, setEditChalan] = useState(null);
   const [editForm, setEditForm] = useState({
     term: '1st Term',
-    monthYear: 'August 2025',
+    monthYear: '',
     tuitionFee: 0,
     developmentFee: 0,
     examFee: 0,
@@ -55,7 +54,7 @@ export default function FeeManagement() {
     setEditChalan(chalan);
     setEditForm({
       term: chalan.term || '1st Term',
-      monthYear: chalan.monthYear || 'August 2025',
+      monthYear: chalan.monthYear || '',
       tuitionFee: chalan.tuitionFee || 0,
       developmentFee: chalan.developmentFee || 0,
       examFee: chalan.examFee || 0,
@@ -65,7 +64,7 @@ export default function FeeManagement() {
       prevBalance: chalan.prevBalance || 0,
       lateFee: chalan.lateFee || 0,
       discounts: chalan.discounts || 0,
-      dueDate: chalan.dueDate || '2025-08-10',
+      dueDate: chalan.dueDate || '',
       status: chalan.status || 'Unpaid'
     });
     setIsEditModalOpen(true);
@@ -79,20 +78,31 @@ export default function FeeManagement() {
   };
 
   // Form Fields matching exact sample
-  const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || '');
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [createClassFilter, setCreateClassFilter] = useState('');
   const [term, setTerm] = useState('1st Term');
-  const [monthYear, setMonthYear] = useState('August 2025');
-  const [session, setSession] = useState('2024–2025');
-  const [tuitionFee, setTuitionFee] = useState(8000);
-  const [developmentFee, setDevelopmentFee] = useState(1500);
-  const [examFee, setExamFee] = useState(1000);
-  const [libraryFee, setLibraryFee] = useState(500);
-  const [computerFee, setComputerFee] = useState(500);
-  const [activityFee, setActivityFee] = useState(500);
+  const [monthYear, setMonthYear] = useState(() => new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }));
+  const [session, setSession] = useState(() => {
+    const y = new Date().getFullYear();
+    return `${y}-${y + 1}`;
+  });
+  const [tuitionFee, setTuitionFee] = useState(0);
+  const [developmentFee, setDevelopmentFee] = useState(0);
+  const [examFee, setExamFee] = useState(0);
+  const [libraryFee, setLibraryFee] = useState(0);
+  const [computerFee, setComputerFee] = useState(0);
+  const [activityFee, setActivityFee] = useState(0);
   const [prevBalance, setPrevBalance] = useState(0);
   const [lateFee, setLateFee] = useState(0);
   const [discounts, setDiscounts] = useState(0);
-  const [dueDate, setDueDate] = useState('2025-08-10');
+  const [dueDate, setDueDate] = useState('');
+
+  // Create-modal student options: ONLY students of the selected class (real catalog).
+  const createModalStudents = useMemo(() => {
+    const safe = Array.isArray(students) ? students : [];
+    if (!createClassFilter) return safe;
+    return safe.filter(s => s && s.classSection === createClassFilter);
+  }, [students, createClassFilter]);
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
@@ -103,7 +113,7 @@ export default function FeeManagement() {
       studentId: std.id,
       studentName: std.name,
       rollNo: std.rollNo,
-      regNo: std.regNo || 'REG-1001-A',
+      regNo: std.regNo || '',
       classSection: std.classSection,
       term,
       monthYear,
@@ -129,11 +139,11 @@ export default function FeeManagement() {
 
   const handleExportSinglePdf = () => {
     if (!singleChalanPreview) return;
-    exportElementToPdf('single-chalan-2part-pdf', `Eduzenta_Chalan_${singleChalanPreview.chalanId}.pdf`);
+    exportElementToPdf('single-chalan-2part-pdf', `Fee_Chalan_${singleChalanPreview.chalanId}.pdf`);
   };
 
   const handleExportBulkPdf = () => {
-    exportElementToPdf('bulk-fee-pdf-container', `Eduzenta_Bulk_Chalans_${Date.now()}.pdf`);
+    exportElementToPdf('bulk-fee-pdf-container', `Fee_Chalans_${Date.now()}.pdf`);
   };
 
   const columns = [
@@ -218,7 +228,7 @@ export default function FeeManagement() {
   ];
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
       <main className="flex-1 w-full min-w-0 overflow-x-hidden p-4 md:p-8">
@@ -230,7 +240,12 @@ export default function FeeManagement() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => autoGenerateMonthlyChalans('August 2025', '2025-08-10', '1st Term')}
+              onClick={() => {
+                const now = new Date();
+                const month = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                const due = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-10`;
+                autoGenerateMonthlyChalans(month, due, '1st Term');
+              }}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all"
             >
               <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
@@ -274,21 +289,39 @@ export default function FeeManagement() {
         >
           <form onSubmit={handleCreateSubmit} className="space-y-4">
             <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Select Class</label>
+              <select
+                value={createClassFilter}
+                onChange={e => { setCreateClassFilter(e.target.value); setSelectedStudentId(''); }}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500 bg-white font-bold"
+              >
+                <option value="">— Select a class —</option>
+                {(Array.isArray(schoolClasses) ? schoolClasses : []).map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Select Student</label>
               <select
                 value={selectedStudentId}
                 onChange={e => setSelectedStudentId(e.target.value)}
+                required
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500 bg-white font-medium"
               >
-                {students.map(s => (
+                <option value="">— Select a student —</option>
+                {createModalStudents.map(s => (
                   <option key={s.id} value={s.id}>
-                    {s.name} (Roll: {s.rollNo} - {s.classSection})
+                    {s.name} (Roll: {s.rollNo || '—'} - {s.classSection})
                   </option>
                 ))}
               </select>
+              {!createModalStudents.length && createClassFilter && (
+                <p className="text-[10px] text-amber-700 font-bold mt-1">No students enrolled in {createClassFilter}.</p>
+              )}
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Academic Term</label>
                 <select
@@ -324,7 +357,7 @@ export default function FeeManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">Tuition Fee (Rs.)</label>
                 <input
@@ -354,7 +387,7 @@ export default function FeeManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">Library Fee (Rs.)</label>
                 <input
@@ -384,7 +417,7 @@ export default function FeeManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Previous Arrears (Rs.)</label>
                 <input
@@ -440,11 +473,11 @@ export default function FeeManagement() {
           maxWidth="max-w-6xl"
         >
           <div className="space-y-4">
-            <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <span className="text-xs font-bold text-slate-700">A4 Landscape Split: Student Copy (Left) & Institute Copy (Right)</span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={triggerPrint}
+                  onClick={() => triggerPrint('single-chalan-2part-pdf')}
                   className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
                 >
                   Window Print
@@ -633,11 +666,11 @@ export default function FeeManagement() {
           maxWidth="max-w-6xl"
         >
           <div className="space-y-4">
-            <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <span className="text-xs font-bold text-slate-700">Multi-Page Bulk A4 Landscape Chalans</span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={triggerPrint}
+                  onClick={() => triggerPrint('bulk-fee-pdf-container')}
                   className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
                 >
                   Window Print

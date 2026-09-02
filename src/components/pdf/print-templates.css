@@ -1,0 +1,140 @@
+/* ============================================================
+   PDF / PRINT TEMPLATES — light document theme only.
+   Contains ONLY hex/rgb/rgba colors (no oklch) so html2canvas
+   rasterizes correctly. Dark mode never affects these rules.
+   ============================================================ */
+
+.pdf-doc,
+.pdf-doc *,
+.pdf-doc-shell,
+.pdf-doc-shell * {
+  color: rgb(15, 23, 42);
+}
+
+.pdf-doc,
+.pdf-doc-shell {
+  background: #ffffff;
+  font-family: Arial, "Segoe UI", Helvetica, sans-serif;
+}
+
+.pdf-doc .pdf-muted,
+.pdf-doc-shell .pdf-muted {
+  color: rgb(100, 116, 139);
+}
+
+.pdf-doc .pdf-accent,
+.pdf-doc-shell .pdf-accent {
+  color: rgb(154, 40, 121);
+}
+
+.pdf-doc .pdf-border,
+.pdf-doc-shell .pdf-border {
+  border-color: rgb(226, 232, 240);
+}
+
+.pdf-doc .pdf-bg-soft,
+.pdf-doc-shell .pdf-bg-soft {
+  background-color: rgb(248, 250, 252);
+}
+
+.pdf-doc table,
+.pdf-doc-shell table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pdf-doc th,
+.pdf-doc td,
+.pdf-doc-shell th,
+.pdf-doc-shell td {
+  border: 1px solid rgb(203, 213, 225);
+  padding: 6px 8px;
+}
+
+.pdf-doc th,
+.pdf-doc-shell th {
+  background-color: rgb(241, 245, 249);
+  font-weight: 700;
+}
+
+.pdf-doc img,
+.pdf-doc-shell img {
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* ----- building blocks for the branded document header ----- */
+.pdf-doc-shell .pdf-school-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 3px solid #5a3193;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+.pdf-doc-shell .pdf-school-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.pdf-doc-shell .pdf-school-name {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0;
+}
+.pdf-doc-shell .pdf-school-address {
+  font-size: 12px;
+  color: #64748b;
+  margin: 2px 0 0;
+}
+.pdf-doc-shell .pdf-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.pdf-doc-shell .pdf-badge-present { background-color: rgba(16, 185, 129, 0.12); color: #047857; }
+.pdf-doc-shell .pdf-badge-absent  { background-color: rgba(239, 68, 68, 0.12);  color: #b91c1c; }
+.pdf-doc-shell .pdf-badge-late    { background-color: rgba(245, 158, 11, 0.15); color: #b45309; }
+.pdf-doc-shell .pdf-badge-excused { background-color: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
+
+/* Isolated print frame — never shows app chrome */
+#eduzenta-print-frame {
+  position: fixed !important;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border: 0;
+}
+
+/* The on-screen mount point used by printDocument(): hidden on screen,
+   becomes the ONLY visible content while the isolated print is active. */
+.pdf-print-portal {
+  display: none;
+}
+body[data-pdf-printing] .pdf-print-portal {
+  display: block !important;
+  background: #ffffff;
+}
+
+@media print {
+  body > #root {
+    visibility: hidden !important;
+  }
+  body[data-pdf-printing] #root {
+    visibility: hidden !important;
+  }
+  body[data-pdf-printing] .pdf-print-portal {
+    display: block !important;
+  }
+  .pdf-doc,
+  .pdf-doc-shell {
+    box-shadow: none !important;
+  }
+}
+

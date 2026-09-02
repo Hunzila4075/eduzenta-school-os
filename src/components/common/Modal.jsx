@@ -22,7 +22,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = "ma
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 max-h-[90vh]">
+        <div className="p-4 sm:p-6 overflow-y-auto overflow-x-auto flex-1 max-h-[90vh]">
           {children}
         </div>
       </div>

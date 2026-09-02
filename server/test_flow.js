@@ -1,6 +1,6 @@
 import pool from './config/db.js';
 import { initializeDatabase } from './config/initDb.js';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 
 async function testFullFlow() {
   console.log('=== TESTING FULL API FLOW FOR CREATION & RE-HYDRATION ===');

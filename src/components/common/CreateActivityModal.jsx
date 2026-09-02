@@ -13,11 +13,20 @@ export default function CreateActivityModal({ isOpen, onClose }) {
     currentUser?.assignedClasses?.[0] || ''
   );
 
-  const handleSubmit = (e) => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !subject || !classSection) return;
-    createActivity({ name, subject, maxMarks, term, classSection });
-    onClose();
+    if (!name || !subject || !classSection || isSaving) return;
+    setIsSaving(true);
+    try {
+      const created = await createActivity({ name, subject, maxMarks, term, classSection });
+      // Close only when the activity was actually persisted — a failed save
+      // keeps the modal open so the teacher can retry (data is never lost).
+      if (created) onClose();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -83,9 +92,10 @@ export default function CreateActivityModal({ isOpen, onClose }) {
         </div>
         <button
           type="submit"
-          className="w-full py-2.5 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-700 transition min-h-[44px]"
+          disabled={isSaving}
+          className="w-full py-2.5 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-700 transition min-h-[44px] disabled:opacity-60"
         >
-          Create Activity
+          {isSaving ? 'Creating...' : 'Create Activity'}
         </button>
       </form>
     </Modal>

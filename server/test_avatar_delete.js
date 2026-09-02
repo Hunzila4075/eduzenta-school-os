@@ -52,7 +52,7 @@ async function runTest() {
 
   // TEST 7: Admin/Teacher DELETE from MySQL
   const testEmail = `test_del_${Date.now()}@eduzenta.test`;
-  const bcrypt = (await import('bcryptjs')).default;
+  const bcrypt = (await import('bcrypt')).default;
   const hashedPass = await bcrypt.hash('testpass123', 10);
   const [uRes] = await conn.query(
     "INSERT INTO users (name, email, password, role, is_active) VALUES ('Delete Test Teacher', ?, ?, 'teacher', 1)",

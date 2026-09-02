@@ -91,3 +91,30 @@ export function requireSchoolAdmin(req, res, next) {
     message: 'School Admin privileges required.'
   });
 }
+
+// Allow only roles that manage school operational data. Non-super staff must
+// carry a school context so a malformed/stale token can never become unscoped.
+export function requireSchoolStaff(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: 'Unauthorized', message: 'Authentication required.' });
+  }
+
+  const role = String(req.user.role || '').toLowerCase();
+  const isSuper = role === 'super_admin' || role === 'superadmin';
+  if (!isSuper && role !== 'admin' && role !== 'teacher') {
+    return res.status(403).json({ success: false, error: 'Forbidden', message: 'School staff access required.' });
+  }
+  if (!isSuper && !req.user.school_id) {
+    return res.status(403).json({ success: false, error: 'Forbidden', message: 'A valid school context is required.' });
+  }
+  return next();
+}
+
+// Broadcasts include public, school-wide notices. Missing auth is permitted so
+// public notices remain visible; a supplied invalid token is still rejected.
+export function optionalAuthenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  if (!authHeader) return next();
+  return authenticateToken(req, res, next);
+}
+

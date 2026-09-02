@@ -1,6 +1,6 @@
 import pool from './config/db.js';
 import { initializeDatabase } from './config/initDb.js';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 
 async function diagnose() {
   console.log('=== STARTING DATABASE DIAGNOSTIC FOR ADMIN & TEACHER PERSISTENCE ===');

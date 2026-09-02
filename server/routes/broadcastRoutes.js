@@ -1,20 +1,32 @@
 import express from 'express';
 import pool from '../config/db.js';
-import { authenticateToken, requireSuperAdmin } from '../middleware/authMiddleware.js';
+import { authenticateToken, optionalAuthenticateToken, requireSuperAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 // ------------------------------------------------------------
 // GET /api/broadcasts — Fetch broadcast announcements / directives from MySQL
 // ------------------------------------------------------------
-router.get('/', async (req, res) => {
+router.get('/', optionalAuthenticateToken, async (req, res) => {
   const { targetSchoolId } = req.query;
   try {
-    let sql = 'SELECT * FROM broadcasts ORDER BY created_at DESC';
-    let params = [];
-    if (targetSchoolId && targetSchoolId !== 'all') {
+    const role = String(req.user?.role || '').toLowerCase();
+    const isSuper = role === 'super_admin' || role === 'superadmin';
+    let sql;
+    let params;
+
+    if (isSuper && targetSchoolId && targetSchoolId !== 'all') {
       sql = 'SELECT * FROM broadcasts WHERE target_school_id = ? OR target_school_id = "all" ORDER BY created_at DESC';
       params = [targetSchoolId];
+    } else if (isSuper) {
+      sql = 'SELECT * FROM broadcasts ORDER BY created_at DESC';
+      params = [];
+    } else if (req.user?.school_id) {
+      sql = 'SELECT * FROM broadcasts WHERE target_school_id = ? OR target_school_id = "all" ORDER BY created_at DESC';
+      params = [String(req.user.school_id)];
+    } else {
+      sql = 'SELECT * FROM broadcasts WHERE target_school_id = "all" ORDER BY created_at DESC';
+      params = [];
     }
 
     const [rows] = await pool.query(sql, params);

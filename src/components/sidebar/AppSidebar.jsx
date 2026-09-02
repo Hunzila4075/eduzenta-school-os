@@ -7,6 +7,7 @@ import {
   UserCheck,
   Users,
   CalendarCheck,
+  History,
   CreditCard,
   FileCheck2,
   Ticket,
@@ -19,9 +20,13 @@ import {
   X
 } from 'lucide-react';
 
+// ThemeToggle removed per project requirements - single consistent theme
+
 export default function AppSidebar() {
-  const { currentView, setCurrentView, currentUser, logout, schools } = useApp();
+  const { currentView, setCurrentView, currentUser, logout, currentSchool } = useApp();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const initials = (name) => (name || 'U').split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || 'U';
 
   if (!currentUser) return null;
 
@@ -30,8 +35,8 @@ export default function AppSidebar() {
   const isAdmin = roleStr === 'admin';
   const isTeacher = roleStr === 'teacher';
 
-  const currentSchool = schools.find(s => String(s.id) === String(currentUser?.schoolId || currentUser?.school_id));
-  const schoolLogo = currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url;
+  // Branding comes exclusively from AppContext (hydrated from /auth/me + schools API).
+  const schoolLogo = currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || '';
   const schoolDisplayName = currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || (isSuperAdmin ? 'Eduzenta Master HQ' : 'School Management');
 
   let navItems = [];
@@ -48,6 +53,7 @@ export default function AppSidebar() {
       { id: 'admin-teachers', label: 'Faculty Management', icon: UserCheck },
       { id: 'admin-students', label: 'Student Database', icon: Users },
       { id: 'admin-attendance', label: 'Attendance Overrides', icon: CalendarCheck },
+      { id: 'admin-attendance-history', label: 'Attendance History', icon: History },
       { id: 'admin-fees', label: 'Fee Chalan Engine', icon: CreditCard },
       { id: 'admin-results', label: 'Result Cards (Bulk PDF)', icon: FileCheck2 },
       { id: 'admin-admit', label: 'Admit Card Generator', icon: Ticket },
@@ -59,6 +65,7 @@ export default function AppSidebar() {
     navItems = [
       { id: 'teacher-dash', label: 'Faculty Dashboard', icon: LayoutDashboard },
       { id: 'teacher-attendance', label: 'Lecture Register (Log)', icon: CalendarCheck },
+      { id: 'teacher-attendance-history', label: 'Attendance History', icon: History },
       { id: 'teacher-marks', label: 'Marks Grid (All Subjects)', icon: FileCheck2 },
       { id: 'teacher-students', label: 'Enrol Student', icon: Users },
       { id: 'teacher-admit', label: 'Class Admit Cards', icon: Ticket },
@@ -91,11 +98,9 @@ export default function AppSidebar() {
           <span className="text-[10px] font-black uppercase text-purple-300 bg-purple-950/80 px-2 py-1 rounded-md border border-purple-800/60">
             {isSuperAdmin ? 'Super Admin' : isAdmin ? 'School Admin' : 'Faculty'}
           </span>
-          <img
-            src={currentUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80"}
-            alt={currentUser.name}
-            className="w-8 h-8 rounded-full object-cover border border-purple-400/40"
-          />
+          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-[#5A3193] to-[#EC4899] text-white text-[10px] font-black border border-purple-400/40 shrink-0">
+            {initials(currentUser.name)}
+          </div>
         </div>
       </div>
 
@@ -176,11 +181,9 @@ export default function AppSidebar() {
         {/* Footer User Profile & Logout */}
         <div className="p-4 border-t border-slate-800/80 bg-slate-950/60">
           <div className="flex items-center gap-3 mb-3">
-            <img
-              src={currentUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80"}
-              alt={currentUser.name}
-              className="w-9 h-9 rounded-full object-cover border border-slate-700"
-            />
+            <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-[#5A3193] to-[#EC4899] text-white text-xs font-black border border-slate-700 shrink-0">
+              {initials(currentUser.name)}
+            </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-white truncate">{currentUser.name}</p>
               <p className="text-[10px] text-slate-400 truncate font-mono">{currentUser.email}</p>

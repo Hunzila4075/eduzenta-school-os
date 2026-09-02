@@ -1,54 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
-import { CalendarCheck, ShieldAlert, Edit3, Trash2, CheckCircle2, XCircle, Clock, Plus, Check, X, Calendar, UserCheck } from 'lucide-react';
+import { ShieldAlert, Trash2, Plus, RefreshCw, CalendarCheck, UserCheck, Users, ClipboardList } from 'lucide-react';
+
+const STATUSES = ['Present', 'Absent', 'Late', 'Excused'];
+const STATUS_STYLE = {
+  Present: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Absent: 'bg-rose-50 text-rose-700 border-rose-200',
+  Late: 'bg-amber-50 text-amber-700 border-amber-200',
+  Excused: 'bg-blue-50 text-blue-700 border-blue-200'
+};
 
 export default function AttendanceOverride() {
-  const context = useApp() || {};
   const {
     attendance = [],
-    attendanceOverrides = [],
     students = [],
+    schoolClasses = [],
     adminUpdateAttendanceRecord,
     adminDeleteAttendance,
     adminRecordClassAttendance,
-    updateAttendanceOverride,
-    deleteAttendanceOverride,
-    currentUser
-  } = context;
+    refreshAttendance,
+    currentUser,
+    addToast
+  } = useApp();
 
-  // ALL hooks must come before any conditional return (React Rules of Hooks)
-  const [selectedEntryId, setSelectedEntryId] = useState(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
-  const [selectedClass, setSelectedClass] = useState('Class 10');
-  const [selectedSection, setSelectedSection] = useState('A');
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [studentStatuses, setStudentStatuses] = useState({});
-
-  const safeAttendanceOverrides = Array.isArray(attendanceOverrides) ? attendanceOverrides : [];
   const safeAttendance = Array.isArray(attendance) ? attendance : [];
   const safeStudents = Array.isArray(students) ? students : [];
-  const overridesList = safeAttendanceOverrides.length > 0 ? safeAttendanceOverrides : safeAttendance;
+  const classes = Array.isArray(schoolClasses) ? schoolClasses.filter(Boolean) : [];
 
-  const classSectionKey = `${selectedClass}-${selectedSection}`;
-  const matchingStudents = safeStudents.filter(s => s && s.classSection === classSectionKey);
-  const displayStudents = matchingStudents.length > 0 ? matchingStudents : safeStudents;
+  // Record modal state
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [recordClass, setRecordClass] = useState('');
+  const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
+  const [recordStatuses, setRecordStatuses] = useState({});
 
-  useEffect(() => {
-    const initialMap = {};
-    displayStudents.forEach(s => {
-      if (s && s.id) initialMap[s.id] = 'Present';
-    });
-    setStudentStatuses(initialMap);
-  }, [selectedClass, selectedSection, isRecordModalOpen]);
+  // Filters (class '' = all classes of this school)
+  const [filterClass, setFilterClass] = useState('');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Safe null guard AFTER all hooks — shows recoverable UI if not logged in
+  // Student lookup for names/rolls (students store is school-scoped from the DB)
+  const studentMap = useMemo(() => {
+    const map = {};
+    safeStudents.forEach(s => { if (s && s.id) map[s.id] = s; });
+    return map;
+  }, [safeStudents]);
+
+  const rows = useMemo(() => {
+    return safeAttendance
+      .filter(r => {
+        if (filterClass && String(r.classSection) !== String(filterClass)) return false;
+        if (filterFrom && String(r.date).slice(0, 10) < filterFrom) return false;
+        if (filterTo && String(r.date).slice(0, 10) > filterTo) return false;
+        return true;
+      })
+      .map(r => {
+        const st = studentMap[r.studentId];
+        return {
+          ...r,
+          date: String(r.date).slice(0, 10),
+          studentName: st?.name || 'Unknown Student',
+          rollNo: st?.rollNo || '—'
+        };
+      });
+  }, [safeAttendance, filterClass, filterFrom, filterTo, studentMap]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshAttendance?.();
+    setIsRefreshing(false);
+  };
+
+  // ---- Record attendance (strict roster: ONLY students of the selected class) ----
+  const roster = useMemo(
+    () => safeStudents.filter(s => s && recordClass && s.classSection === recordClass),
+    [safeStudents, recordClass]
+  );
+
+  const openRecordModal = () => {
+    setRecordClass('');
+    setRecordStatuses({});
+    setIsRecordModalOpen(true);
+  };
+
+  const handleRosterStatus = (id, status) => setRecordStatuses(prev => ({ ...prev, [id]: status }));
+  const handleMarkAll = (status) => {
+    const map = {};
+    roster.forEach(s => { map[s.id] = status; });
+    setRecordStatuses(map);
+  };
+
+  const handleSaveRecord = async (e) => {
+    e.preventDefault();
+    if (!recordClass) { addToast('Validation', 'Select a class first.', 'warning'); return; }
+    if (roster.length === 0) { addToast('Validation', 'This class has no enrolled students.', 'warning'); return; }
+    const recordsArray = roster.map(s => ({
+      studentId: s.id,
+      studentName: s.name,
+      status: recordStatuses[s.id] || 'Present'
+    }));
+    const res = await adminRecordClassAttendance(recordClass, recordDate, recordsArray);
+    if (res?.success) setIsRecordModalOpen(false);
+  };
+
   if (!currentUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 font-sans">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 font-sans">
         <div className="p-8 bg-white rounded-2xl border border-slate-200 shadow text-center space-y-3 max-w-sm">
           <h2 className="font-bold text-slate-900">Session Required</h2>
           <p className="text-xs text-slate-500">Please log in to access Attendance Override management.</p>
@@ -57,356 +117,244 @@ export default function AttendanceOverride() {
     );
   }
 
-  const selectedEntry = overridesList.find(a => a && a.id === selectedEntryId);
-
-  const handleOpenDetails = (entry) => {
-    if (!entry) return;
-    setSelectedEntryId(entry.id);
-    setIsDetailModalOpen(true);
-  };
-
-  const handleSetSingleStatus = (stdId, status) => {
-    setStudentStatuses(prev => ({ ...prev, [stdId]: status }));
-  };
-
-  const handleMarkAll = (status) => {
-    const updatedMap = {};
-    (displayStudents || []).forEach(s => {
-      if (s && s.id) updatedMap[s.id] = status;
-    });
-    setStudentStatuses(updatedMap);
-  };
-
-  const handleSaveAttendance = (e) => {
-    e.preventDefault();
-    if (!displayStudents || displayStudents.length === 0) return;
-
-    const recordsArray = displayStudents.map(s => ({
-      studentId: s.id,
-      studentName: s.name,
-      status: studentStatuses[s.id] || 'Present'
-    }));
-
-    if (adminRecordClassAttendance) {
-      adminRecordClassAttendance(classSectionKey, attendanceDate, recordsArray);
-    }
-    setIsRecordModalOpen(false);
-  };
-
-  const handleUpdateRecord = (entryObjId, studentId, status) => {
-    if (updateAttendanceOverride) {
-      updateAttendanceOverride(entryObjId, studentId, status);
-    } else if (adminUpdateAttendanceRecord) {
-      adminUpdateAttendanceRecord(entryObjId, studentId, status);
-    }
-  };
-
-  const handleDeleteRecord = (entryObjId) => {
-    if (deleteAttendanceOverride) {
-      deleteAttendanceOverride(entryObjId);
-    } else if (adminDeleteAttendance) {
-      adminDeleteAttendance(entryObjId);
-    }
-  };
-
   const columns = [
     {
-      label: 'Class & Date',
+      label: 'Date',
+      accessor: 'date',
+      render: (row) => <span className="font-mono font-bold text-slate-800">{row.date}</span>
+    },
+    {
+      label: 'Class',
       accessor: 'classSection',
+      render: (row) => <span className="font-extrabold text-slate-900">{row.classSection}</span>
+    },
+    {
+      label: 'Student',
+      accessor: 'studentName',
       render: (row) => (
         <div>
-          <div className="font-extrabold text-slate-900">{row?.classSection || 'Class 10-A'}</div>
-          <div className="text-[11px] text-slate-500 font-mono">Date: {row?.date || 'N/A'}</div>
+          <div className="font-extrabold text-slate-900 text-xs">{row.studentName}</div>
+          <div className="text-[10px] text-slate-400 font-mono">ID: {row.studentId}</div>
         </div>
       )
     },
+    { label: 'Roll No', accessor: 'rollNo' },
     {
-      label: 'Submission Lock Status',
-      accessor: 'isLockedByTeacher',
-      render: () => (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-50 text-purple-800 border border-purple-300">
-          Admin Lock Enforced (Override Available)
-        </span>
+      label: 'Status (Override)',
+      accessor: 'status',
+      render: (row) => (
+        <select
+          value={row.status}
+          onChange={(e) => adminUpdateAttendanceRecord(row.id, null, e.target.value)}
+          className={`px-2 py-1 rounded-lg border text-[11px] font-bold cursor-pointer ${STATUS_STYLE[row.status] || 'border-slate-300 bg-white text-slate-700'}`}
+        >
+          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
       )
     },
     {
-      label: 'Present Ratio',
-      accessor: 'records',
-      render: (row) => {
-        const recs = row?.records || [];
-        const presentCount = recs.filter(r => r?.status === 'Present').length;
-        const total = recs.length;
-        const pct = total > 0 ? ((presentCount / total) * 100).toFixed(0) : 0;
-        return (
-          <span className="font-bold text-slate-900">
-            {presentCount} / {total} Students Present ({pct}%)
-          </span>
-        );
-      }
+      label: 'Marked By',
+      accessor: 'markedBy',
+      render: (row) => <span className="text-[11px] text-slate-500 font-medium">{row.markedBy || '—'}</span>
     },
     {
-      label: 'School Admin Actions',
+      label: 'Actions',
       sortable: false,
       render: (row) => (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleOpenDetails(row)}
-            className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors flex items-center gap-1 min-h-[44px]"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Manage & Override</span>
-          </button>
-
-          <button
-            onClick={() => handleDeleteRecord(row?.id)}
-            className="p-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-            title="Delete Attendance Record (Admin Exclusive)"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
+        <button
+          onClick={() => adminDeleteAttendance(row.id)}
+          className="p-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          title="Delete attendance record (Admin exclusive)"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       )
     }
   ];
 
+  const totalPresent = rows.filter(r => r.status === 'Present').length;
+  const totalAbsent = rows.filter(r => r.status === 'Absent').length;
+
   return (
-    <div className="flex min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-50 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
       <main className="flex-1 w-full min-w-0 overflow-x-hidden p-4 md:p-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Attendance Overrides & Management Engine</h1>
-            <p className="text-xs text-slate-500 font-medium">Record class attendance for any date, modify existing entries, and manage school-wide overrides.</p>
-          </div>
-
-          <button
-            onClick={() => setIsRecordModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all min-h-[44px]"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Record / Take Class Attendance</span>
-          </button>
-        </div>
-
-        {/* Lock Rule Banner */}
-        <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3">
-          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="text-xs">
-            <h4 className="font-extrabold uppercase tracking-wide">Strict Admin Control & Lock Enforcement</h4>
-            <p className="mt-0.5 text-amber-800 font-medium">
-              Teacher submissions automatically lock to prevent unauthorized edits. As a School Administrator ({currentUser?.name || 'Admin'}), you hold full authority to record backdated logs, override individual records, or delete entries.
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
+              <ShieldAlert className="w-6 h-6 text-[#5A3193]" />
+              Attendance Override
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Change any saved attendance status (Present / Absent / Late / Excused). Every change persists to the database instantly.
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-100 transition-colors flex items-center gap-1.5 min-h-[44px] disabled:opacity-60"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={openRecordModal}
+              className="px-4 py-2.5 rounded-xl bg-[#5A3193] text-white text-xs font-bold hover:bg-[#4a2878] transition-colors flex items-center gap-1.5 shadow-md min-h-[44px]"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Record Attendance</span>
+            </button>
+          </div>
         </div>
 
-        <DataTable
-          title="School-wide Attendance Overrides Logs"
-          subtitle="All class attendance records synced with student reports and result cards."
-          columns={columns}
-          data={overridesList || []}
-          searchPlaceholder="Search class, date..."
-        />
+        {/* Filters */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1 min-w-0">
+            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Class</label>
+            <select
+              value={filterClass}
+              onChange={(e) => setFilterClass(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="">All Classes</option>
+              {classes.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="flex-1 min-w-0">
+            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">From</label>
+            <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-white focus:ring-2 focus:ring-purple-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">To</label>
+            <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-white focus:ring-2 focus:ring-purple-500" />
+          </div>
+        </div>
 
-        {/* Record Class Attendance Modal */}
-        <Modal
-          isOpen={isRecordModalOpen}
-          onClose={() => setIsRecordModalOpen(false)}
-          title="Admin Class Attendance Register Engine"
-          maxWidth="max-w-3xl"
-        >
-          <form onSubmit={handleSaveAttendance} className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200"><ClipboardList className="w-5 h-5 text-[#5A3193]" /></div>
+            <div><div className="text-lg font-black text-slate-900">{rows.length}</div><div className="text-[10px] font-bold uppercase text-slate-500">Records (filtered)</div></div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200"><UserCheck className="w-5 h-5 text-emerald-600" /></div>
+            <div><div className="text-lg font-black text-slate-900">{totalPresent}</div><div className="text-[10px] font-bold uppercase text-slate-500">Present</div></div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200"><Users className="w-5 h-5 text-rose-600" /></div>
+            <div><div className="text-lg font-black text-slate-900">{totalAbsent}</div><div className="text-[10px] font-bold uppercase text-slate-500">Absent</div></div>
+          </div>
+        </div>
+
+        {classes.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center">
+            <CalendarCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="font-black text-slate-800 text-sm mb-1">No classes in your school catalog yet</h3>
+            <p className="text-xs text-slate-500">Create classes first (Academic Management) — attendance is recorded per real class only.</p>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={rows}
+            title="Attendance Records"
+            subtitle="Saved attendance pulled live from the database"
+            searchPlaceholder="Search student, class, date, marked by..."
+            filterKey="status"
+            filterOptions={STATUSES}
+          />
+        )}
+
+        {/* Record Attendance Modal */}
+        <Modal isOpen={isRecordModalOpen} onClose={() => setIsRecordModalOpen(false)} title="Record Class Attendance">
+          <form onSubmit={handleSaveRecord} className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Select Class</label>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Class *</label>
                 <select
-                  value={selectedClass}
-                  onChange={e => setSelectedClass(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white focus:outline-none focus:border-purple-500"
-                >
-                  {Array.from({ length: 10 }, (_, i) => `Class ${i + 1}`).map(cls => (
-                    <option key={cls} value={cls}>{cls}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Select Section</label>
-                <select
-                  value={selectedSection}
-                  onChange={e => setSelectedSection(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white focus:outline-none focus:border-purple-500"
-                >
-                  <option value="A">Section A</option>
-                  <option value="B">Section B</option>
-                  <option value="C">Section C</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-purple-600" /> Attendance Date
-                </label>
-                <input
-                  type="date"
+                  value={recordClass}
+                  onChange={(e) => { setRecordClass(e.target.value); setRecordStatuses({}); }}
                   required
-                  value={attendanceDate}
-                  onChange={e => setAttendanceDate(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold focus:outline-none focus:border-purple-500"
-                />
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">— Select a class —</option>
+                  {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Date *</label>
+                <input type="date" value={recordDate} onChange={(e) => setRecordDate(e.target.value)} required
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white focus:ring-2 focus:ring-purple-500" />
               </div>
             </div>
 
-            {/* Batch Action Toolbar */}
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-extrabold text-slate-800">
-                Enrolled Students ({displayStudents.length}) — {classSectionKey}
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleMarkAll('Present')}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold text-[11px] hover:bg-emerald-200 transition-colors"
-                >
-                  Mark All Present
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMarkAll('Absent')}
-                  className="px-3 py-1.5 rounded-lg bg-rose-100 text-rose-800 border border-rose-300 font-extrabold text-[11px] hover:bg-rose-200 transition-colors"
-                >
-                  Mark All Absent
-                </button>
+            {recordClass && roster.length === 0 && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-bold">
+                No students are enrolled in {recordClass}. Enroll students first.
               </div>
-            </div>
+            )}
 
-            {/* Student Attendance List */}
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {(displayStudents || []).map((s) => {
-                const status = studentStatuses[s.id] || 'Present';
-                return (
-                  <div key={s.id} className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between shadow-xs">
-                    <div>
-                      <div className="font-extrabold text-slate-900 text-xs">{s.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">Roll #{s.rollNo} • ID: {s.id}</div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleSetSingleStatus(s.id, 'Present')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-                          status === 'Present' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        Present
+            {roster.length > 0 && (
+              <>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-black text-slate-700">{roster.length} students in {recordClass}</span>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {STATUSES.map(s => (
+                      <button key={s} type="button" onClick={() => handleMarkAll(s)}
+                        className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white font-bold hover:bg-slate-50">
+                        All {s}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetSingleStatus(s.id, 'Absent')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-                          status === 'Absent' ? 'bg-rose-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        Absent
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetSingleStatus(s.id, 'Leave')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-                          status === 'Leave' ? 'bg-amber-500 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        Leave
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {roster.map(s => (
+                    <div key={s.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <div className="font-extrabold text-slate-900">{s.name}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">Roll: {s.rollNo || '—'} · {s.regNo || s.id}</div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {STATUSES.map(st => (
+                          <button key={st} type="button"
+                            onClick={() => handleRosterStatus(s.id, st)}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                              (recordStatuses[s.id] || 'Present') === st
+                                ? 'bg-[#5A3193] text-white shadow-md'
+                                : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {st}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
-            <div className="flex justify-end gap-2 pt-3 border-t">
-              <button
-                type="button"
-                onClick={() => setIsRecordModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50"
-              >
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setIsRecordModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 min-h-[44px]">
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="px-5 py-2.5 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-700 shadow-md flex items-center gap-1.5 min-h-[44px]"
-              >
-                <UserCheck className="w-4 h-4" />
-                <span>Save Class Attendance Log</span>
+              <button type="submit"
+                className="px-5 py-2.5 rounded-xl bg-[#5A3193] text-white font-bold hover:bg-[#4a2878] shadow-md flex items-center gap-1.5 min-h-[44px] disabled:opacity-50"
+                disabled={!recordClass || roster.length === 0}>
+                <CalendarCheck className="w-4 h-4" />
+                <span>Save to Database</span>
               </button>
             </div>
           </form>
-        </Modal>
-
-        {/* Detail & Override Modal */}
-        <Modal
-          isOpen={isDetailModalOpen && !!selectedEntry}
-          onClose={() => setIsDetailModalOpen(false)}
-          title={selectedEntry ? `Override Attendance: ${selectedEntry.classSection} (${selectedEntry.date})` : 'Override Attendance'}
-        >
-          {selectedEntry && (
-            <div className="space-y-4 text-xs">
-              <p className="text-slate-600 font-medium">
-                Click any student status below to immediately override attendance status:
-              </p>
-
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                {(selectedEntry.records || []).map((rec, idx) => (
-                  <div key={rec?.studentId || idx} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
-                    <div>
-                      <div className="font-extrabold text-slate-900 text-xs">{rec?.studentName || 'Student'}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">ID: {rec?.studentId}</div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleUpdateRecord(selectedEntry.id, rec.studentId, 'Present')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          rec?.status === 'Present' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-white border text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        Present
-                      </button>
-                      <button
-                        onClick={() => handleUpdateRecord(selectedEntry.id, rec.studentId, 'Absent')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          rec?.status === 'Absent' ? 'bg-rose-600 text-white shadow-xs' : 'bg-white border text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        Absent
-                      </button>
-                      <button
-                        onClick={() => handleUpdateRecord(selectedEntry.id, rec.studentId, 'Leave')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          rec?.status === 'Leave' ? 'bg-amber-500 text-white shadow-xs' : 'bg-white border text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        Leave
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-end pt-3">
-                <button
-                  onClick={() => setIsDetailModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-sm hover:bg-slate-800"
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          )}
         </Modal>
       </main>
     </div>
   );
 }
+
+
+

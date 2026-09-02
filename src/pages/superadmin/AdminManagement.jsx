@@ -4,7 +4,7 @@ import AppSidebar from '../../components/sidebar/AppSidebar';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import { handleLocalFileUpload } from '../../utils/fileUpload';
-import { createSchoolAdmin as createSchoolAdminApi, fetchSchools } from '../../services/api';
+import { createSchoolAdmin as createSchoolAdminApi } from '../../services/api';
 import { ShieldCheck, Plus, Edit3, Trash2, Globe, Image, Upload, Loader2 } from 'lucide-react';
 
 export default function AdminManagement() {
@@ -25,30 +25,19 @@ export default function AdminManagement() {
 
   // Form Fields as per specs
   const [schoolName, setSchoolName] = useState('');
-  const [schoolLogoUrl, setSchoolLogoUrl] = useState('https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=250&q=80');
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [city, setCity] = useState('Knowledge City');
+  const [city, setCity] = useState('');
 
   // Derive admin list dynamically from live users state with normalized role check
   const adminUsers = users.filter(u => {
     const r = String(u.role || '').toLowerCase();
     return r === 'admin' || r === 'school_admin' || r === 'school-admin';
   });
-
-  useEffect(() => {
-    // Async attempt to fetch fresh schools from remote backend
-    fetchSchools()
-      .then(res => {
-        if (res?.schools && res.schools.length > 0) {
-          console.log('✅ Remote schools fetched successfully:', res.schools.length);
-        }
-      })
-      .catch(err => console.warn('Remote schools fetch skipped, using local store:', err.message));
-  }, []);
 
 
   const resetForm = () => {
@@ -59,7 +48,7 @@ export default function AdminManagement() {
     setEmail('');
     setPassword('');
     setPhone('');
-    setCity('Knowledge City');
+    setCity('');
     setEditingUserId(null);
   };
 
@@ -86,6 +75,7 @@ export default function AdminManagement() {
     try {
       const res = await createSchoolAdminApi({
         school_name: schoolName,
+        school_logo_url: (schoolLogoUrl && String(schoolLogoUrl).trim()) || null,
         admin_name: adminFullName,
         admin_email: email,
         admin_password: adminPassword
@@ -97,7 +87,7 @@ export default function AdminManagement() {
           id: res.admin.id,           // Real numeric DB user id
           schoolId: res.school.id,    // Real numeric DB school id
           schoolName: res.school.name,
-          schoolLogoUrl,
+          schoolLogoUrl: res.school.logo_url || res.school.logoUrl || schoolLogoUrl || null,
           name: res.admin.name,
           email: res.admin.email,
           firstName,
@@ -171,7 +161,7 @@ export default function AdminManagement() {
       render: (row) => {
         const sch = schools.find(s => String(s.id) === String(row.schoolId) || String(s.id) === String(row.school_id));
         const logo = sch?.logoUrl || sch?.logo_url || row.schoolLogoUrl || row.school_logo_url;
-        const displayName = sch?.name || row.schoolName || row.school_name || 'Eduzenta School';
+        const displayName = sch?.name || row.schoolName || row.school_name || 'Unnamed School';
         return (
           <div className="flex items-center gap-3">
             {logo ? (
@@ -250,7 +240,7 @@ export default function AdminManagement() {
   ];
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
       <main className="flex-1 w-full min-w-0 overflow-x-hidden p-4 md:p-8">
@@ -309,7 +299,7 @@ export default function AdminManagement() {
                   autoComplete="address-level2"
                   value={city}
                   onChange={e => setCity(e.target.value)}
-                  placeholder="Knowledge City"
+                  placeholder="City name"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500"
                 />
               </div>

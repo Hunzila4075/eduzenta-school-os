@@ -5,21 +5,30 @@ import StatCard from '../../components/common/StatCard';
 import { BookOpen, Users, CalendarCheck, Bell, ShieldLock, FileCheck2, ArrowRight } from 'lucide-react';
 
 export default function TeacherDashboard() {
-  const { currentUser, reminders, students, setCurrentView } = useApp();
+  const { currentUser, currentSchool, reminders, students, setCurrentView, myClasses } = useApp();
 
-  const assignedClasses = currentUser?.assignedClasses || ['Class 10-A', 'Class 9-B'];
-  const assignedSubjects = currentUser?.assignedSubjects || ['Physics', 'Mathematics'];
+  const assignedClasses = Array.isArray(myClasses) && myClasses.length ? myClasses : [];
+  const assignedSubjects = currentUser?.assignedSubjects || [];
+  // BRANDING — the faculty panel shows the same server-hydrated school identity
+  // (currentSchool ↔ /auth/me) that feeds every PDF document.
+  const schoolDisplayName = currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || '';
+  const schoolLogo = currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || '';
 
   const myStudentsCount = students.filter(s => assignedClasses.includes(s.classSection)).length;
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 w-full min-w-0 overflow-x-hidden p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Faculty Dashboard</h1>
+            <div className="flex items-center gap-3">
+              {schoolLogo ? (
+                <img src={schoolLogo} alt={schoolDisplayName} className="w-10 h-10 rounded-lg object-cover border border-slate-200 bg-white p-0.5 shrink-0" />
+              ) : null}
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">{schoolDisplayName || 'Faculty Dashboard'}</h1>
+            </div>
             <p className="text-xs text-slate-500 font-medium">Welcome back, {currentUser?.name}. Review assigned classes, daily attendance, and broadcast notices.</p>
           </div>
 

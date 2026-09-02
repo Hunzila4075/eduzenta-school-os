@@ -63,11 +63,29 @@
   box-shadow: 0 0 0 3px rgba(90, 49, 147, 0.15);
 }
 
-/* QOBE Login Card Blur Backdrop */
+/* Login Page Neutral Backdrop — clean, no external image, no school branding before auth.
+   NOTE: no backdrop-filter here — the backdrop is full-screen and opaque, blur() there
+   is pure GPU waste and visibly slowed low-end devices. */
 .qobe-login-backdrop {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(90, 49, 147, 0.85) 100%),
-              url('https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1920&q=80') center/cover no-repeat;
-  backdrop-filter: blur(8px);
+  background: linear-gradient(160deg, #ffffff 0%, #f6f1fc 45%, #fdf0f6 100%);
+}
+
+/* QOBE purple accent for the Faculty Login button */
+.qobe-btn-faculty {
+  background-color: #5A3193;
+  color: #ffffff;
+  transition: all 0.2s ease-in-out;
+}
+.qobe-btn-faculty:hover {
+  background-color: #4C2A7B;
+  box-shadow: 0 6px 16px rgba(90, 49, 147, 0.35);
+}
+
+/* Documents always render in a professional light style — dark mode is not supported */
+#print-root,
+[data-print-doc] {
+  background: #ffffff !important;
+  color: #1e293b !important;
 }
 
 /* Custom Scrollbar */

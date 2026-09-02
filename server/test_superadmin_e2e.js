@@ -1,6 +1,6 @@
 import pool from './config/db.js';
 import { initializeDatabase } from './config/initDb.js';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import JWT_SECRET from './config/jwtConfig.js';
 

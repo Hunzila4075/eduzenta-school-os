@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
-import { UserCheck, Plus, Edit3, Trash2, BookOpen, Layers } from 'lucide-react';
+import { Plus, Edit3, Trash2 } from 'lucide-react';
 
 export default function TeacherManagement() {
   const {
@@ -15,7 +15,6 @@ export default function TeacherManagement() {
 
   const teachers = users.filter(u => String(u.role || '').toLowerCase() === 'teacher');
 
-
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState(null);
@@ -23,15 +22,20 @@ export default function TeacherManagement() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [assignedClasses, setAssignedClasses] = useState('Class 10-A, Class 9-B');
-  const [assignedSubjects, setAssignedSubjects] = useState('Physics, Mathematics');
+  // Assigned Classes is a free-text field: the admin types any class names,
+  // comma separated. Parsed to an array only at submit time.
+  const [assignedClasses, setAssignedClasses] = useState('');
+  const [assignedSubjects, setAssignedSubjects] = useState('');
+
+  const parseClassList = (text) =>
+    String(text || '').split(',').map(s => s.trim()).filter(Boolean);
 
   const resetForm = () => {
     setName('');
     setEmail('');
     setPassword('');
-    setAssignedClasses('Class 10-A');
-    setAssignedSubjects('Physics');
+    setAssignedClasses('');
+    setAssignedSubjects('');
     setEditingTeacherId(null);
   };
 
@@ -41,8 +45,8 @@ export default function TeacherManagement() {
       name,
       email,
       password: password || 'teacher123',
-      assignedClasses: assignedClasses.split(',').map(s => s.trim()),
-      assignedSubjects: assignedSubjects.split(',').map(s => s.trim())
+      assignedClasses: parseClassList(assignedClasses),
+      assignedSubjects: assignedSubjects.split(',').map(s => s.trim()).filter(Boolean)
     });
     if (result?.success !== false) {
       setIsAddModalOpen(false);
@@ -50,23 +54,24 @@ export default function TeacherManagement() {
     }
   };
 
-
   const handleEditOpen = (teacher) => {
     setEditingTeacherId(teacher.id);
     setName(teacher.name);
     setEmail(teacher.email);
-    setAssignedClasses(teacher.assignedClasses ? teacher.assignedClasses.join(', ') : 'Class 10-A');
-    setAssignedSubjects(teacher.assignedSubjects ? teacher.assignedSubjects.join(', ') : 'Physics');
+    // Pre-fill exactly the classes persisted in teacher_class_assignments
+    setAssignedClasses(Array.isArray(teacher.assignedClasses) ? teacher.assignedClasses.filter(Boolean).join(', ') : '');
+    setAssignedSubjects(teacher.assignedSubjects ? teacher.assignedSubjects.join(', ') : '');
     setIsEditModalOpen(true);
   };
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
+    // Removal works: sending the new (possibly smaller) set REPLACES assignments
     updateTeacher(editingTeacherId, {
       name,
       email,
-      assignedClasses: assignedClasses.split(',').map(s => s.trim()),
-      assignedSubjects: assignedSubjects.split(',').map(s => s.trim())
+      assignedClasses: parseClassList(assignedClasses),
+      assignedSubjects: assignedSubjects.split(',').map(s => s.trim()).filter(Boolean)
     });
     setIsEditModalOpen(false);
     resetForm();
@@ -91,11 +96,17 @@ export default function TeacherManagement() {
       accessor: 'assignedClasses',
       render: (row) => (
         <div className="flex flex-wrap gap-1">
-          {row.assignedClasses?.map((c, i) => (
-            <span key={i} className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
-              {c}
+          {(row.assignedClasses || []).length === 0 ? (
+            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
+              No classes assigned
             </span>
-          ))}
+          ) : (
+            row.assignedClasses.map((c, i) => (
+              <span key={i} className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                {c}
+              </span>
+            ))
+          )}
         </div>
       )
     },
@@ -104,11 +115,15 @@ export default function TeacherManagement() {
       accessor: 'assignedSubjects',
       render: (row) => (
         <div className="flex flex-wrap gap-1">
-          {row.assignedSubjects?.map((s, i) => (
-            <span key={i} className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200">
-              {s}
-            </span>
-          ))}
+          {(row.assignedSubjects || []).length === 0 ? (
+            <span className="text-[10px] text-slate-400">—</span>
+          ) : (
+            row.assignedSubjects.map((s, i) => (
+              <span key={i} className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200">
+                {s}
+              </span>
+            ))
+          )}
         </div>
       )
     },
@@ -179,7 +194,7 @@ export default function TeacherManagement() {
                 autoComplete="name"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="e.g. Prof. Marcus Thorne"
+                placeholder="e.g. Ms. Ayesha Khan"
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
@@ -211,7 +226,8 @@ export default function TeacherManagement() {
               />
             </div>
             <div>
-              <label htmlFor="teacher-classes" className="block text-xs font-bold text-slate-700 mb-1">Assigned Classes (Comma separated)</label>
+              <label htmlFor="teacher-classes" className="block text-xs font-bold text-slate-700 mb-1">Assigned Classes</label>
+              <p className="text-[11px] text-slate-500 mb-1">Enter class names (comma separated)</p>
               <input
                 id="teacher-classes"
                 name="assignedClasses"
@@ -219,9 +235,10 @@ export default function TeacherManagement() {
                 autoComplete="off"
                 value={assignedClasses}
                 onChange={e => setAssignedClasses(e.target.value)}
-                placeholder="e.g. Class 10-A, Class 9-B"
+                placeholder="e.g. Class 8-C, Class 9-A, Class 10-B"
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
+              <p className="text-[11px] text-slate-500 mt-1">You can assign any class manually. Separate multiple classes with commas.</p>
             </div>
             <div>
               <label htmlFor="teacher-subjects" className="block text-xs font-bold text-slate-700 mb-1">Assigned Subjects (Comma separated)</label>
@@ -232,7 +249,7 @@ export default function TeacherManagement() {
                 autoComplete="off"
                 value={assignedSubjects}
                 onChange={e => setAssignedSubjects(e.target.value)}
-                placeholder="e.g. Physics, Mathematics"
+                placeholder="Subjects this teacher teaches (comma separated)"
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
@@ -289,6 +306,7 @@ export default function TeacherManagement() {
             </div>
             <div>
               <label htmlFor="edit-teacher-classes" className="block text-xs font-bold text-slate-700 mb-1">Assigned Classes</label>
+              <p className="text-[11px] text-slate-500 mb-1">Enter class names (comma separated)</p>
               <input
                 id="edit-teacher-classes"
                 name="assignedClasses"
@@ -296,8 +314,10 @@ export default function TeacherManagement() {
                 autoComplete="off"
                 value={assignedClasses}
                 onChange={e => setAssignedClasses(e.target.value)}
+                placeholder="e.g. Class 8-C, Class 9-A, Class 10-B"
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
+              <p className="text-[11px] text-slate-500 mt-1">You can assign any class manually. Separate multiple classes with commas. Remove a class by deleting it from the list.</p>
             </div>
             <div>
               <label htmlFor="edit-teacher-subjects" className="block text-xs font-bold text-slate-700 mb-1">Assigned Subjects</label>

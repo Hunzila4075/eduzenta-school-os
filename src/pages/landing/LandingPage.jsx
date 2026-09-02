@@ -3,19 +3,8 @@ import { useApp } from '../../context/AppContext';
 import PublicNavbar from '../../components/navbar/PublicNavbar';
 import EduzentaLogo from '../../components/common/EduzentaLogo';
 import {
-  ShieldCheck,
-  School,
-  UserCheck,
-  FileCheck2,
-  CreditCard,
-  CalendarCheck,
-  ArrowRight,
-  ChevronDown,
-  Sparkles,
-  Lock,
-  Download,
-  BarChart3,
-  CheckCircle2
+  ShieldCheck, School, UserCheck, FileCheck2, CreditCard, CalendarCheck,
+  ArrowRight, ChevronDown, Sparkles, Lock, Download, BarChart3, CheckCircle2, Users
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -23,250 +12,193 @@ export default function LandingPage() {
   const [activeFaq, setActiveFaq] = useState(null);
 
   const faqs = [
-    {
-      q: "What is Eduzenta SaaS School OS?",
-      a: "Eduzenta is an all-in-one multi-tenant cloud SaaS system built to streamline school operations, fee collection, bulk result card PDF generation, attendance tracking, and faculty workflows from a single unified portal."
-    },
-    {
-      q: "How does the Unified Login system handle role security?",
-      a: "Eduzenta features a single clean login portal. Users enter their assigned credentials, and our dynamic authentication engine seamlessly directs Super Admins, School Admins, or Faculty members to their respective dashboards while instantly enforcing subscription payment locks."
-    },
-    {
-      q: "Can School Admins override teacher attendance records?",
-      a: "Yes! Once a teacher submits daily attendance, the entry locks immediately to prevent unauthorized edits by faculty. Only authorized School Admins retain override and delete permissions."
-    },
-    {
-      q: "How does the Fee Chalan and Printable Result Card PDF engine work?",
-      a: "Eduzenta includes built-in continuous multi-page PDF export engines. Admins can bulk generate roll-number-wise fee chalans and official printable student result cards (complete with auto grade calculations, signature blocks, and mandatory watermark footers) with one click."
-    },
-    {
-      q: "How does the Notes & Directives broadcast system work?",
-      a: "Super Admins can publish rich announcements with image attachments, video links, and priority directives to specific or all school admins with real-time unread badges and embedded media player previews."
-    }
+    { q: "What is Eduzenta SaaS School OS?", a: "Eduzenta is an all-in-one multi-tenant cloud SaaS system that streamlines school operations, fee collection, bulk result card PDF generation, attendance tracking, and faculty workflows from a single unified portal." },
+    { q: "How does the Unified Login system handle role security?", a: "Eduzenta features a single clean login portal. Users enter their assigned credentials, and the smart authentication engine directs Super Admins, School Admins, or Faculty to their dashboards while enforcing subscription payment locks." },
+    { q: "Can School Admins override teacher attendance records?", a: "Once a teacher submits daily attendance, the entry locks immediately. Only authorized School Admins retain override and delete permissions." },
+    { q: "How does the Fee Chalan and Result Card PDF engine work?", a: "Admins can bulk generate roll-number-wise fee chalans and official printable student result cards with auto grade calculations, signature blocks, and watermark footers." },
+    { q: "How does the broadcast system work?", a: "Super Admins can publish rich announcements, video links, and priority directives to specific or all school admins with real-time unread badges." }
+  ];
+
+  const heroCards = [
+    { icon: Users, label: 'Student Database', color: 'from-blue-500 to-indigo-600', stat: 'Real-time class-wise roster' },
+    { icon: CalendarCheck, label: 'Attendance Engine', color: 'from-emerald-500 to-teal-600', stat: 'Locked teacher registers' },
+    { icon: FileCheck2, label: 'Result Cards PDF', color: 'from-purple-500 to-[#5A3193]', stat: 'Bulk printable reports' }
+  ];
+
+  const features = [
+    { icon: School, title: 'Multi-School Management', desc: 'Onboard and manage multiple institutions from one unified platform with full data isolation.' },
+    { icon: UserCheck, title: 'Teacher Class Isolation', desc: 'Teachers see only assigned classes - enforced server-side across the whole system.' },
+    { icon: CalendarCheck, title: 'Attendance Engine', desc: 'Daily registers with locked submissions and admin override controls.' },
+    { icon: FileCheck2, title: 'Result Cards PDF', desc: 'Bulk multi-page result cards with auto grades and signature blocks.' },
+    { icon: CreditCard, title: 'Fee Chalan Engine', desc: 'Automated monthly chalans with server-calculated totals and A4 layouts.' },
+    { icon: Download, title: 'Admit Card Generator', desc: 'Official admit cards from real student records with school branding.' }
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-white text-slate-800 flex flex-col font-sans selection:bg-pink-100 selection:text-pink-700">
       <PublicNavbar />
 
-      {/* HERO SECTION */}
-      <section className="relative pt-20 pb-28 overflow-hidden gradient-hero">
+      {/* HERO */}
+      <section className="relative pt-16 pb-20 overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white">
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-200/40 blur-3xl" />
+        <div className="absolute top-40 -right-24 w-96 h-96 rounded-full bg-pink-200/40 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 w-72 h-72 rounded-full bg-indigo-200/30 blur-3xl" />
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-950/80 border border-blue-800/60 text-blue-300 text-xs font-bold mb-6 shadow-inner animate-pulse">
-            <Sparkles className="w-4 h-4 text-teal-400" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-purple-200 text-purple-700 text-xs font-bold mb-6 shadow-sm">
+            <Sparkles className="w-4 h-4 text-pink-500" />
             <span>Next-Generation SaaS School Management System</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-none text-white max-w-5xl mx-auto">
-            Empowering Modern Education with <span className="gradient-text">Eduzenta OS</span>
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-tight text-slate-900 max-w-5xl mx-auto">
+            Empowering Modern Education with{' '}
+            <span className="bg-gradient-to-r from-[#5A3193] via-[#7042b3] to-pink-500 bg-clip-text text-transparent">Eduzenta OS</span>
           </h1>
 
-          <p className="mt-6 text-base sm:text-xl text-slate-400 max-w-3xl mx-auto font-normal leading-relaxed">
-            A comprehensive, multi-school management solution connecting Super Admins, School Leaders, and Faculty with automated fee chalans, strict attendance engines, and printable PDF result cards.
+          <p className="mt-6 text-base sm:text-lg text-slate-500 max-w-3xl mx-auto font-normal leading-relaxed">
+            A multi-school management solution connecting Super Admins, School Leaders, and Faculty with automated fee chalans, strict attendance engines, and printable PDF result cards.
           </p>
-
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+<div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
               onClick={() => setCurrentView('login')}
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-teal-500 hover:from-blue-500 hover:to-teal-400 text-white font-extrabold text-sm shadow-xl shadow-blue-600/30 hover:shadow-blue-600/50 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-0.5"
+              className="flex items-center gap-2 px-8 py-3.5 rounded-xl qobe-btn-faculty text-white text-sm font-black shadow-lg shadow-purple-700/30 transition-all transform hover:-translate-y-0.5 min-h-[48px]"
             >
-              <span>Access Unified Portal</span>
+              <Lock className="w-4 h-4" />
+              Get Started
               <ArrowRight className="w-4 h-4" />
             </button>
-            <a
-              href="#features"
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-sm transition-colors text-center"
+            <button
+              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-white border border-slate-300 text-slate-700 text-sm font-black shadow-sm hover:border-purple-400 hover:text-[#5A3193] transition-all min-h-[48px]"
             >
-              Explore Platform Features
-            </a>
+              Explore Features
+            </button>
           </div>
 
-          {/* Interactive Metric Badges */}
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
-              <h4 className="text-2xl font-black text-white">500+</h4>
-              <p className="text-xs text-slate-400 mt-1 font-semibold uppercase tracking-wider">Active Schools</p>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
-              <h4 className="text-2xl font-black text-teal-400">120K+</h4>
-              <p className="text-xs text-slate-400 mt-1 font-semibold uppercase tracking-wider">Students Managed</p>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
-              <h4 className="text-2xl font-black text-blue-400">99.9%</h4>
-              <p className="text-xs text-slate-400 mt-1 font-semibold uppercase tracking-wider">SaaS Uptime</p>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
-              <h4 className="text-2xl font-black text-purple-400">100%</h4>
-              <p className="text-xs text-slate-400 mt-1 font-semibold uppercase tracking-wider">PDF Automation</p>
+          {/* 3D-style dashboard mockup card */}
+          <div className="mt-16 max-w-4xl mx-auto relative">
+            <div className="relative rounded-3xl bg-white border border-slate-200 shadow-2xl shadow-slate-300/60 overflow-hidden text-left">
+              <div className="flex items-center gap-1.5 px-5 py-3 border-b border-slate-100 bg-slate-50/80">
+                <span className="w-3 h-3 rounded-full bg-pink-300" />
+                <span className="w-3 h-3 rounded-full bg-amber-300" />
+                <span className="w-3 h-3 rounded-full bg-emerald-300" />
+                <span className="ml-3 text-[10px] font-mono text-slate-400">app.eduzenta.com - School Operating System</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
+                {heroCards.map(card => (
+                  <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} text-white flex items-center justify-center mb-3 shadow-md`}>
+                      <card.icon className="w-5 h-5" />
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{card.label}</p>
+                    <p className="text-[11px] text-slate-500 mt-1 font-medium">{card.stat}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ABOUT EDUZENTA SECTION */}
-      <section id="about" className="py-20 bg-slate-900/50 border-y border-slate-800">
+      {/* FEATURES */}
+      <section id="features" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <span className="text-xs font-black uppercase tracking-widest text-teal-400">About Eduzenta SaaS</span>
-              <h2 className="text-3xl sm:text-4xl font-black text-white mt-2 leading-tight">
-                Architected for Multi-School Operations & Complete Control
-              </h2>
-              <p className="mt-4 text-slate-400 text-sm leading-relaxed">
-                Eduzenta provides an enterprise-grade cloud ecosystem where Super Admins can license schools, manage billing, and enforce lockout rules, while School Admins oversee faculty, maintain student databases, generate fee chalans, and publish academic report cards.
-              </p>
-              
-              <div className="mt-6 space-y-3">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-300"><strong>Single Universal Login:</strong> Intelligent role-based redirection without confusing selector toggles.</p>
+          <div className="text-center mb-12">
+            <span className="text-xs font-black uppercase tracking-widest text-pink-500">Platform Features</span>
+            <h2 className="text-3xl font-black text-slate-900 mt-2">Everything your school needs, in one place</h2>
+            <p className="text-sm text-slate-500 mt-3 max-w-2xl mx-auto">Purpose-built modules that keep class isolation, real data, and institutional branding consistent across every screen.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map(f => (
+              <div key={f.title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#5A3193] to-pink-500 text-white flex items-center justify-center mb-4 shadow-md">
+                  <f.icon className="w-5 h-5" />
                 </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-300"><strong>Strict Lock Attendance Rules:</strong> Teacher attendance locks immediately upon submission, protecting data integrity.</p>
+                <h3 className="text-sm font-black text-slate-900">{f.title}</h3>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+{/* HIGHLIGHTS */}
+      <section id="highlights" className="py-20 bg-slate-50/70">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="text-xs font-black uppercase tracking-widest text-purple-600">Platform Highlights</span>
+            <h2 className="text-3xl font-black text-slate-900 mt-2">Built for operators, trusted by institutions</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+            {[
+              { icon: ShieldCheck, title: 'Role-Based Security', desc: 'Super Admin, School Admin, and Teacher access routes are enforced on the backend, not just hidden in the UI.' },
+              { icon: BarChart3, title: 'Real-Time Dashboard', desc: 'Live student counts, fee collections, and attendance summaries computed from the database.' },
+              { icon: CreditCard, title: 'Server-Calculated Fees', desc: 'Chalan totals are computed server-side; the frontend always displays persisted values, never made-up amounts.' },
+              { icon: CheckCircle2, title: 'Branding Everywhere', desc: 'School name, logo, and address propagate identically into dashboards, result cards, challans, admit cards, and PDFs.' }
+            ].map(h => (
+              <div key={h.title} className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 text-[#5A3193] flex items-center justify-center shrink-0">
+                  <h.icon className="w-5 h-5" />
                 </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-300"><strong>Bulk Multi-Page PDF Engine:</strong> Print entire class result cards, fee chalans, or admit cards in a single file.</p>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">{h.title}</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{h.desc}</p>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-2xl relative">
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="w-6 h-6 text-blue-400" />
-                    <div>
-                      <h4 className="text-xs font-bold text-white">Super Admin Control</h4>
-                      <p className="text-[11px] text-slate-400">Account Lockout & Subscription Management</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-800/60">Active</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <School className="w-6 h-6 text-teal-400" />
-                    <div>
-                      <h4 className="text-xs font-bold text-white">School Admin Portal</h4>
-                      <p className="text-[11px] text-slate-400">Student Database & Fee Engine</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-black uppercase text-blue-400 bg-blue-950 px-2.5 py-1 rounded-full border border-blue-800/60">Active</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <UserCheck className="w-6 h-6 text-purple-400" />
-                    <div>
-                      <h4 className="text-xs font-bold text-white">Faculty Workflows</h4>
-                      <p className="text-[11px] text-slate-400">Marks Upload & Daily Attendance</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-black uppercase text-purple-400 bg-purple-950 px-2.5 py-1 rounded-full border border-purple-800/60">Active</span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* FEATURES HIGHLIGHT SECTION */}
-      <section id="features" className="py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="text-xs font-black uppercase tracking-widest text-blue-400">Enterprise Capabilities</span>
-          <h2 className="text-3xl sm:text-4xl font-black text-white mt-2">Designed for End-to-End Educational Excellence</h2>
-          <p className="mt-3 text-slate-400 text-sm">Explore the six pillars powering Eduzenta's SaaS infrastructure.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/5 group">
-            <div className="w-12 h-12 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-white">Super Admin Control</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Full developer oversight, revenue metrics, IP session logging, and instant account locking for pending payments.
+      {/* ABOUT / ARCHITECTURE */}
+      <section id="about" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <span className="text-xs font-black uppercase tracking-widest text-pink-500">About Eduzenta</span>
+            <h2 className="text-3xl font-black text-slate-900 mt-2 leading-tight">A multi-tenant cloud architecture built for scale</h2>
+            <p className="text-sm text-slate-500 mt-4 leading-relaxed">
+              Each school is fully isolated in its own tenant boundary. Admins manage their real class catalog while teachers are bound to only the classes assigned to them. Every document - result cards, fee challans, and admit cards - is generated from genuine database records with the school's own branding woven throughout.
             </p>
+            <ul className="mt-6 space-y-3 text-sm text-slate-600">
+              {['Single unified login with automatic role detection', 'Server-enforced teacher class isolation', 'Persistent fee, marks, attendance, and admit card records', 'Isolated print and PDF rendering for clean documents'].map(item => (
+                <li key={item} className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-teal-500/50 transition-all hover:shadow-xl hover:shadow-teal-500/5 group">
-            <div className="w-12 h-12 rounded-xl bg-teal-600/20 text-teal-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <CreditCard className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-white">Fee Chalan Engine</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Dynamic fee inputs (Tuition, Exam, Transport, Late Fee, Discounts) with automated monthly bulk generation and printable 3-part PDFs.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-purple-500/50 transition-all hover:shadow-xl hover:shadow-purple-500/5 group">
-            <div className="w-12 h-12 rounded-xl bg-purple-600/20 text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <FileCheck2 className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-white">Printable Result Cards</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Compliant layout with Eduzenta logo, editable school header, auto grade calculations, teacher remarks, and mandatory disclaimer watermark footers.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 transition-all hover:shadow-xl hover:shadow-amber-500/5 group">
-            <div className="w-12 h-12 rounded-xl bg-amber-600/20 text-amber-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <CalendarCheck className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-white">Strict Attendance Engine</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Teacher daily attendance locks immediately after submission. School Admins hold exclusive override and deletion rights.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition-all hover:shadow-xl hover:shadow-emerald-500/5 group">
-            <div className="w-12 h-12 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <Download className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-white">Admit Card Generator</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Single-click multi-page admit cards PDF export for the entire school or assigned teacher class groups.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-rose-500/50 transition-all hover:shadow-xl hover:shadow-rose-500/5 group">
-            <div className="w-12 h-12 rounded-xl bg-rose-600/20 text-rose-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <Lock className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-white">Universal Profile & Security</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Standardized profile configuration with OTP password reset verification across all user roles.
+          <div className="rounded-3xl bg-gradient-to-br from-[#5A3193] via-[#4C2A7B] to-pink-600 p-8 text-white shadow-2xl shadow-purple-900/25">
+            <EduzentaLogo variant="dark" className="h-9 mb-6" />
+            <p className="text-lg font-black leading-snug">One platform. Every role. Consistent real data everywhere.</p>
+            <p className="text-xs text-purple-100 mt-3 leading-relaxed">
+              From class assignment to branded PDF output, Eduzenta keeps a single source of truth so nothing is ever faked or duplicated.
             </p>
           </div>
         </div>
       </section>
-
-      {/* FAQS SECTION */}
-      <section id="faqs" className="py-20 bg-slate-900/40 border-t border-slate-800">
+{/* FAQS */}
+      <section id="faqs" className="py-20 bg-slate-50/70">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <span className="text-xs font-black uppercase tracking-widest text-teal-400">Have Questions?</span>
-            <h2 className="text-3xl font-black text-white mt-2">Frequently Asked Questions</h2>
+            <span className="text-xs font-black uppercase tracking-widest text-purple-600">Have Questions?</span>
+            <h2 className="text-3xl font-black text-slate-900 mt-2">Frequently Asked Questions</h2>
           </div>
 
           <div className="space-y-4">
             {faqs.map((faq, idx) => (
-              <div
-                key={idx}
-                className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden transition-colors"
-              >
+              <div key={idx} className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden transition-all">
                 <button
                   onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
-                  className="w-full flex items-center justify-between p-5 text-left text-sm font-bold text-white hover:text-blue-400 transition-colors"
+                  className="w-full flex items-center justify-between p-5 text-left text-sm font-bold text-slate-900 hover:text-[#5A3193] transition-colors"
                 >
                   <span>{faq.q}</span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${activeFaq === idx ? 'rotate-180 text-blue-400' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${activeFaq === idx ? 'rotate-180 text-pink-500' : ''}`} />
                 </button>
-
                 {activeFaq === idx && (
-                  <div className="px-5 pb-5 text-xs text-slate-400 leading-relaxed border-t border-slate-800/60 pt-3">
+                  <div className="px-5 pb-5 text-xs text-slate-500 leading-relaxed border-t border-slate-100 pt-3">
                     {faq.a}
                   </div>
                 )}
@@ -277,27 +209,27 @@ export default function LandingPage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="mt-auto border-t border-slate-800 bg-slate-950 py-12">
+      <footer className="mt-auto border-t border-slate-200 bg-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex flex-col items-center md:items-start gap-2">
-            <EduzentaLogo variant="dark" className="h-8" />
+            <EduzentaLogo variant="light" className="h-8" />
             <p className="text-xs text-slate-500 font-medium">
-              Enterprise SaaS School OS © {new Date().getFullYear()} Eduzenta Inc. All rights reserved.
+              Enterprise SaaS School OS (c) {new Date().getFullYear()} Eduzenta Inc. All rights reserved.
             </p>
-            <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-400 mt-1">
-              <span className="text-purple-400/90 font-semibold">Eduzenta — Developed by <strong className="text-purple-300">Hunzila Khan</strong></span>
+            <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-500 mt-1">
+              <span className="text-purple-700 font-semibold">Eduzenta - Developed by <strong className="text-pink-600">Hunzila Khan</strong></span>
               <span>•</span>
-              <a href="mailto:eduzentawithkhan@gmail.com" className="hover:text-white transition-colors">eduzentawithkhan@gmail.com</a>
+              <a href="mailto:eduzentawithkhan@gmail.com" className="hover:text-[#5A3193] transition-colors">eduzentawithkhan@gmail.com</a>
               <span>•</span>
-              <a href="tel:+923330935652" className="hover:text-white transition-colors font-mono">+92 333 0935652</a>
+              <a href="tel:+923330935652" className="hover:text-[#5A3193] transition-colors font-mono">+92 333 0935652</a>
             </div>
           </div>
 
-          <div className="flex items-center gap-6 text-xs text-slate-400 font-semibold">
-            <button onClick={() => setCurrentView('login')} className="hover:text-white transition-colors">Unified Login</button>
-            <a href="#features" className="hover:text-white transition-colors">Platform Features</a>
-            <a href="#about" className="hover:text-white transition-colors">Architecture</a>
-            <a href="mailto:support@eduzenta.com" className="hover:text-white transition-colors">Contact Support</a>
+          <div className="flex items-center gap-6 text-xs text-slate-500 font-semibold">
+            <button onClick={() => setCurrentView('login')} className="hover:text-[#5A3193] transition-colors">Unified Login</button>
+            <a href="#features" className="hover:text-[#5A3193] transition-colors">Platform Features</a>
+            <a href="#about" className="hover:text-[#5A3193] transition-colors">Architecture</a>
+            <a href="mailto:support@eduzenta.com" className="hover:text-[#5A3193] transition-colors">Contact Support</a>
           </div>
         </div>
       </footer>

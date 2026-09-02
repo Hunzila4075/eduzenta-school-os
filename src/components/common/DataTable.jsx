@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Download, ChevronLeft, ChevronRight, ArrowUpDown, FileSpreadsheet, FileText } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -21,6 +21,13 @@ export default function DataTable({
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
 
+  // Debounced search — avoids re-filtering the full dataset on every keystroke
+  const [debouncedTerm, setDebouncedTerm] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedTerm(searchTerm), 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Null-safe data guard — prevents crash if parent passes undefined/null
   const safeData = Array.isArray(data) ? data : [];
 
@@ -33,13 +40,13 @@ export default function DataTable({
       }
 
       // Search match
-      if (!searchTerm) return true;
-      const term = searchTerm.toLowerCase();
+      if (!debouncedTerm) return true;
+      const term = debouncedTerm.toLowerCase();
       return Object.values(item).some(val =>
         val && String(val).toLowerCase().includes(term)
       );
     });
-  }, [safeData, searchTerm, selectedFilter, filterKey]);
+  }, [safeData, debouncedTerm, selectedFilter, filterKey]);
 
   // Sorting
   const sortedData = useMemo(() => {

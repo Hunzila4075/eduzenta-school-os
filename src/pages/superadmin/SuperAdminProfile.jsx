@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import { handleLocalFileUpload } from '../../utils/fileUpload';
@@ -8,12 +8,25 @@ import { User, Key, Camera, Upload, Save, ShieldCheck, Loader2 } from 'lucide-re
 export default function SuperAdminProfile() {
   const { currentUser, updateProfileInfo, resetPasswordSimple } = useApp();
 
-  const [firstName, setFirstName] = useState(currentUser?.firstName || 'Alex');
-  const [middleName, setMiddleName] = useState(currentUser?.middleName || 'D.');
-  const [lastName, setLastName] = useState(currentUser?.lastName || 'Vance');
-  const [phone, setPhone] = useState(currentUser?.phone || '+1 (555) 999-8877');
-  const [designation, setDesignation] = useState(currentUser?.designation || 'Chief SaaS Developer / Super Admin');
+  const [firstName, setFirstName] = useState(currentUser?.firstName || '');
+  const [middleName, setMiddleName] = useState(currentUser?.middleName || '');
+  const [lastName, setLastName] = useState(currentUser?.lastName || '');
+  const [phone, setPhone] = useState(currentUser?.phone || '');
+  const [designation, setDesignation] = useState(currentUser?.designation || '');
   const [avatar, setAvatar] = useState(currentUser?.avatar || '');
+
+  // Re-sync form fields when the live profile hydrates from /auth/me after a
+  // page refresh (the fetch resolves AFTER the initial useState values are set).
+  useEffect(() => {
+    if (!currentUser) return;
+    const parts = (currentUser.name || '').split(' ');
+    setFirstName(currentUser.firstName || parts[0] || '');
+    setMiddleName(currentUser.middleName || '');
+    setLastName(currentUser.lastName || parts.slice(1).join(' ') || '');
+    if (currentUser.phone) setPhone(currentUser.phone);
+    if (currentUser.designation) setDesignation(currentUser.designation);
+    if (currentUser.avatar) setAvatar(currentUser.avatar);
+  }, [currentUser]);
 
   // Password fields
   const [newPassword, setNewPassword] = useState('');
@@ -70,10 +83,10 @@ export default function SuperAdminProfile() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 w-full min-w-0 overflow-x-hidden p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Super Admin Profile & Security</h1>
@@ -109,7 +122,7 @@ export default function SuperAdminProfile() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">First Name</label>
                   <input

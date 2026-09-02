@@ -1,5 +1,5 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import pool from '../config/db.js';
 import { authenticateToken, requireSuperAdmin } from '../middleware/authMiddleware.js';
 
@@ -31,18 +31,8 @@ router.post('/create-school-admin', authenticateToken, requireSuperAdmin, async 
   try {
     await connection.beginTransaction();
 
-    // Check if email already exists
-    const [existing] = await connection.query('SELECT id FROM users WHERE email = ?', [cleanEmail]);
-    if (existing && existing.length > 0) {
-      await connection.rollback();
-      return res.status(409).json({
-        success: false,
-        error: 'Conflict Error',
-        message: 'A user account with this email address already exists.'
-      });
-    }
-
     // 1. Create School
+    // (duplicate admin emails are caught by the users.email UNIQUE index → rollback + 409)
     const [schoolRes] = await connection.query(
       `INSERT INTO schools (name, logo_url, status) VALUES (?, ?, 'Active')`,
       [cleanSchoolName, cleanSchoolLogo]
@@ -82,6 +72,13 @@ router.post('/create-school-admin', authenticateToken, requireSuperAdmin, async 
   } catch (error) {
     await connection.rollback();
     console.error('[CREATE SCHOOL ADMIN ERROR]:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        success: false,
+        error: 'Conflict Error',
+        message: 'A user account with this email address already exists.'
+      });
+    }
     if (error.code === 'PROTOCOL_CONNECTION_LOST' || error.code === 'ETIMEDOUT') {
       return res.status(504).json({ success: false, error: 'Database Timeout', message: 'Database query timed out.' });
     }
@@ -124,25 +121,35 @@ router.put('/schools/:id', authenticateToken, requireSuperAdmin, async (req, res
   const targetLogo = (logo_url || logoUrl || schoolLogoUrl) ? String(logo_url || logoUrl || schoolLogoUrl) : null;
 
   try {
-    const [existing] = await pool.query('SELECT id FROM schools WHERE id = ?', [schoolId]);
-    if (!existing || existing.length === 0) {
+    const [existingRows] = await pool.query(
+      'SELECT id, name, logo_url, status, created_at FROM schools WHERE id = ?',
+      [schoolId]
+    );
+    const existing = existingRows[0];
+    if (!existing) {
       return res.status(404).json({ success: false, error: 'Not Found', message: 'School record not found.' });
     }
 
-    if (targetName && targetLogo) {
-      await pool.query('UPDATE schools SET name = ?, logo_url = ? WHERE id = ?', [targetName, targetLogo, schoolId]);
-    } else if (targetName) {
-      await pool.query('UPDATE schools SET name = ? WHERE id = ?', [targetName, schoolId]);
-    } else if (targetLogo) {
-      await pool.query('UPDATE schools SET logo_url = ? WHERE id = ?', [targetLogo, schoolId]);
+    // ONE merged dynamic UPDATE replaces up to 2 UPDATE statements + the re-SELECT
+    const fields = [];
+    const values = [];
+    if (targetName) { fields.push('name = ?'); values.push(targetName); }
+    if (targetLogo) { fields.push('logo_url = ?'); values.push(targetLogo); }
+    if (status) { fields.push('status = ?'); values.push(status); }
+
+    if (fields.length > 0) {
+      values.push(schoolId);
+      await pool.query(`UPDATE schools SET ${fields.join(', ')} WHERE id = ?`, values);
     }
 
-    if (status) {
-      await pool.query('UPDATE schools SET status = ? WHERE id = ?', [status, schoolId]);
-    }
-
-    const [updatedRows] = await pool.query('SELECT id, name, logo_url, status, created_at FROM schools WHERE id = ?', [schoolId]);
-    const updatedSchool = updatedRows[0];
+    // Construct the updated school record locally (created_at never changes)
+    const updatedSchool = {
+      id: existing.id,
+      name: targetName || existing.name,
+      logo_url: targetLogo || existing.logo_url,
+      status: status || existing.status,
+      created_at: existing.created_at
+    };
 
     return res.json({
       success: true,
@@ -174,12 +181,11 @@ router.put('/schools/:id/status', authenticateToken, requireSuperAdmin, async (r
   }
 
   try {
-    const [existing] = await pool.query('SELECT id, name, status FROM schools WHERE id = ?', [schoolId]);
-    if (!existing || existing.length === 0) {
+    // UPDATE-first: affectedRows doubles as the existence check (saves one round-trip)
+    const [updateResult] = await pool.query('UPDATE schools SET status = ? WHERE id = ?', [status, schoolId]);
+    if (!updateResult.affectedRows) {
       return res.status(404).json({ success: false, error: 'Not Found', message: 'School record not found.' });
     }
-
-    await pool.query('UPDATE schools SET status = ? WHERE id = ?', [status, schoolId]);
 
     const [updatedRows] = await pool.query('SELECT id, name, logo_url, status, created_at FROM schools WHERE id = ?', [schoolId]);
     const updatedSchool = updatedRows[0];

@@ -25,3 +25,8 @@ server/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Local QA/debug files
+api-search.txt
+server_pid.txt
+server/_*.mjs

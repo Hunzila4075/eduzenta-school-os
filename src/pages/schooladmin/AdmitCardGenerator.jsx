@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import DataTable from '../../components/common/DataTable';
@@ -11,19 +11,19 @@ export default function AdmitCardGenerator() {
   const {
     admitCards,
     students,
+    schoolClasses,
     currentUser,
+    currentSchool,
     schools,
     addAdmitCard,
     updateAdmitCard,
     deleteAdmitCard
   } = useApp();
 
-  const currentSchool = schools.find(s => String(s.id) === String(currentUser?.schoolId || currentUser?.school_id)) || schools[0];
-
   const schoolInfo = {
-    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || "Eduzenta School",
-    logoUrl: currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || "",
-    address: currentSchool?.address || "Education Boulevard, Knowledge City"
+    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || '',
+    logoUrl: currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || '',
+    address: currentSchool?.address || currentUser?.schoolAddress || currentUser?.school_address || ''
   };
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -33,9 +33,17 @@ export default function AdmitCardGenerator() {
   const [isBulkPreviewModalOpen, setIsBulkPreviewModalOpen] = useState(false);
 
   // Form Fields
-  const [studentId, setStudentId] = useState(students[0]?.id || '');
+  const [studentId, setStudentId] = useState('');
+  const [createClassFilter, setCreateClassFilter] = useState('');
   const [term, setTerm] = useState('1st Term');
-  const [examCenter, setExamCenter] = useState('Main Campus Block B (Hall A)');
+  const [examCenter, setExamCenter] = useState('');
+
+  // Create-modal student options: ONLY students of the selected class (real catalog).
+  const createModalStudents = useMemo(() => {
+    const safe = Array.isArray(students) ? students : [];
+    if (!createClassFilter) return safe;
+    return safe.filter(s => s && s.classSection === createClassFilter);
+  }, [students, createClassFilter]);
 
   const handleAddSubmit = (e) => {
     e.preventDefault();
@@ -46,7 +54,7 @@ export default function AdmitCardGenerator() {
       studentId: std.id,
       studentName: std.name,
       rollNo: std.rollNo,
-      regNo: std.regNo || 'REG-1001-A',
+      regNo: std.regNo || '',
       classSection: std.classSection,
       term,
       examCenter
@@ -57,7 +65,7 @@ export default function AdmitCardGenerator() {
   const handleEditOpen = (card) => {
     setEditingCardId(card.id);
     setTerm(card.term || '1st Term');
-    setExamCenter(card.examCenter || 'Main Campus Block B (Hall A)');
+    setExamCenter(card.examCenter || '');
     setIsEditModalOpen(true);
   };
 
@@ -74,14 +82,14 @@ export default function AdmitCardGenerator() {
       render: (row) => (
         <div>
           <div className="font-extrabold text-[#5A3193]">{row.rollNo}</div>
-          <div className="text-[11px] text-slate-500 font-mono">{row.regNo || 'REG-1001-A'}</div>
+          <div className="text-[11px] text-slate-500 font-mono">{row.regNo || '—'}</div>
         </div>
       )
     },
-    { label: 'Student Name', accessor: 'studentName font-black text-slate-900' },
+    { label: 'Student Name', accessor: 'studentName' },
     { label: 'Class', accessor: 'classSection' },
-    { label: 'Exam Term', accessor: 'term font-bold text-slate-800' },
-    { label: 'Hall & Center', accessor: 'examCenter font-mono text-[11px]' },
+    { label: 'Exam Term', accessor: 'term' },
+    { label: 'Hall & Center', accessor: 'examCenter' },
     {
       label: 'Actions (Full CRUD)',
       sortable: false,
@@ -112,10 +120,10 @@ export default function AdmitCardGenerator() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 w-full min-w-0 overflow-x-hidden p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Admit Cards & Hall Tickets (Full CRUD)</h1>
@@ -158,16 +166,34 @@ export default function AdmitCardGenerator() {
         >
           <form onSubmit={handleAddSubmit} className="space-y-4">
             <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Select Class</label>
+              <select
+                value={createClassFilter}
+                onChange={e => { setCreateClassFilter(e.target.value); setStudentId(''); }}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500 bg-white font-bold"
+              >
+                <option value="">— Select a class —</option>
+                {(Array.isArray(schoolClasses) ? schoolClasses : []).map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Select Student</label>
               <select
                 value={studentId}
                 onChange={e => setStudentId(e.target.value)}
+                required
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500 bg-white font-medium"
               >
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} (Roll: {s.rollNo} - {s.classSection})</option>
+                <option value="">— Select a student —</option>
+                {createModalStudents.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} (Roll: {s.rollNo || '—'} - {s.classSection})</option>
                 ))}
               </select>
+              {!createModalStudents.length && createClassFilter && (
+                <p className="text-[10px] text-amber-700 font-bold mt-1">No students enrolled in {createClassFilter}.</p>
+              )}
             </div>
 
             <div>
@@ -269,13 +295,13 @@ export default function AdmitCardGenerator() {
           <div className="space-y-4">
             <div className="flex items-center justify-end gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <button
-                onClick={triggerPrint}
+                onClick={() => triggerPrint('single-admit-pdf')}
                 className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
               >
                 Window Print
               </button>
               <button
-                onClick={() => exportElementToPdf('single-admit-pdf', `Eduzenta_AdmitCard_${singlePreviewCard?.rollNo}.pdf`)}
+                onClick={() => exportElementToPdf('single-admit-pdf', `AdmitCard_${singlePreviewCard?.rollNo || 'student'}.pdf`)}
                 className="px-3.5 py-1.5 rounded-xl qobe-btn-primary text-xs font-bold"
               >
                 Download PDF
@@ -298,13 +324,13 @@ export default function AdmitCardGenerator() {
           <div className="space-y-4">
             <div className="flex items-center justify-end gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <button
-                onClick={triggerPrint}
+                onClick={() => triggerPrint('bulk-admit-pdf-container')}
                 className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
               >
                 Window Print
               </button>
               <button
-                onClick={() => exportElementToPdf('bulk-admit-pdf-container', `Eduzenta_Bulk_AdmitCards_${Date.now()}.pdf`)}
+                onClick={() => exportElementToPdf('bulk-admit-pdf-container', 'AdmitCards.pdf')}
                 className="px-3.5 py-1.5 rounded-xl qobe-btn-primary text-xs font-bold"
               >
                 Download Bulk PDF

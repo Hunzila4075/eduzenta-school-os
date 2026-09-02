@@ -17,7 +17,7 @@ export function exportActivityToExcel(activityId, activities, students, marks) {
   const classStudents = students.filter((s) => s.classSection === activity.classSection);
   const rows = classStudents.map((student) => {
     const existing = marks.find((m) => m.studentId === student.id && m.term === activity.term);
-    const subjectEntry = existing?.subjects?.find((sub) => sub.name === activity.subject);
+    const subjectEntry = existing?.subjects?.find((sub) => (sub.subject || sub.name) === activity.subject);
     return {
       StudentId: student.id,
       StudentName: student.name,

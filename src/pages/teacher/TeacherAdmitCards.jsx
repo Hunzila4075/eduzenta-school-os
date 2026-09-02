@@ -12,18 +12,22 @@ export default function TeacherAdmitCards() {
     admitCards,
     students,
     currentUser,
-    schools,
+    currentSchool,
+    myClasses,
     addAdmitCard,
     updateAdmitCard,
-    deleteAdmitCard
+    deleteAdmitCard,
+    addToast
   } = useApp();
 
-  const currentSchool = schools.find(s => String(s.id) === String(currentUser?.schoolId || currentUser?.school_id)) || schools[0];
+  // STRICT class isolation: only students in the teacher's assigned classes appear.
+  const allowedClasses = Array.isArray(myClasses) && myClasses.length ? myClasses : [];
+  const availableStudents = (Array.isArray(students) ? students : []).filter(s => allowedClasses.includes(s && s.classSection));
 
   const schoolInfo = {
-    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || "Eduzenta School",
-    logoUrl: currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || "",
-    address: currentSchool?.address || "Education Boulevard, Knowledge City"
+    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || '',
+    logoUrl: currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || '',
+    address: currentSchool?.address || currentUser?.schoolAddress || currentUser?.school_address || ''
   };
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -33,20 +37,36 @@ export default function TeacherAdmitCards() {
   const [isBulkPreviewModalOpen, setIsBulkPreviewModalOpen] = useState(false);
 
   // Form Fields
-  const [studentId, setStudentId] = useState(students[0]?.id || '');
+  const [studentId, setStudentId] = useState('');
   const [term, setTerm] = useState('1st Term');
-  const [examCenter, setExamCenter] = useState('Main Campus Block B (Hall A)');
+  const [examCenter, setExamCenter] = useState('');
+
+  // Opening the modal preselects the first available student. A controlled
+  // <select value={studentId}> with initial '' does NOT reflect the visually
+  // selected first option, so submitting without touching the dropdown used to
+  // find `students.find(s => s.id === '')` → undefined → silent return with NO
+  // API call (the admit card was never saved and no error appeared).
+  const openAddModal = () => {
+    const first = availableStudents[0];
+    setStudentId(first ? String(first.id) : '');
+    setTerm('1st Term');
+    setExamCenter('');
+    setIsAddModalOpen(true);
+  };
 
   const handleAddSubmit = (e) => {
     e.preventDefault();
-    const std = students.find(s => s.id === studentId);
-    if (!std) return;
+    const std = (Array.isArray(students) ? students : []).find(s => String(s.id) === String(studentId));
+    if (!std) {
+      addToast('Student Required', 'Please select a student from your assigned classes and try again.', 'warning');
+      return;
+    }
 
     addAdmitCard({
       studentId: std.id,
       studentName: std.name,
       rollNo: std.rollNo,
-      regNo: std.regNo || 'REG-1001-A',
+      regNo: std.regNo || '',
       classSection: std.classSection,
       term,
       examCenter
@@ -57,7 +77,7 @@ export default function TeacherAdmitCards() {
   const handleEditOpen = (card) => {
     setEditingCardId(card.id);
     setTerm(card.term || '1st Term');
-    setExamCenter(card.examCenter || 'Main Campus Block B (Hall A)');
+    setExamCenter(card.examCenter || '');
     setIsEditModalOpen(true);
   };
 
@@ -74,14 +94,14 @@ export default function TeacherAdmitCards() {
       render: (row) => (
         <div>
           <div className="font-extrabold text-[#5A3193]">{row.rollNo}</div>
-          <div className="text-[11px] text-slate-500 font-mono">{row.regNo || 'REG-1001-A'}</div>
+          <div className="text-[11px] text-slate-500 font-mono">{row.regNo || '—'}</div>
         </div>
       )
     },
-    { label: 'Student Name', accessor: 'studentName font-black text-slate-900' },
+    { label: 'Student Name', accessor: 'studentName' },
     { label: 'Class', accessor: 'classSection' },
-    { label: 'Exam Term', accessor: 'term font-bold text-slate-800' },
-    { label: 'Hall & Center', accessor: 'examCenter font-mono text-[11px]' },
+    { label: 'Exam Term', accessor: 'term' },
+    { label: 'Hall & Center', accessor: 'examCenter' },
     {
       label: 'Faculty CRUD Actions',
       sortable: false,
@@ -112,10 +132,10 @@ export default function TeacherAdmitCards() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 w-full min-w-0 overflow-x-hidden p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Class Admit Cards (Faculty Management)</h1>
@@ -124,7 +144,7 @@ export default function TeacherAdmitCards() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={openAddModal}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl qobe-btn-primary text-xs font-bold shadow-md transition-all"
             >
               <Plus className="w-4 h-4" />
@@ -164,7 +184,9 @@ export default function TeacherAdmitCards() {
                 onChange={e => setStudentId(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-purple-500 bg-white font-medium"
               >
-                {students.map(s => (
+                {availableStudents.length === 0 ? (
+                  <option value="">No students in your assigned classes</option>
+                ) : availableStudents.map(s => (
                   <option key={s.id} value={s.id}>{s.name} (Roll: {s.rollNo} - {s.classSection})</option>
                 ))}
               </select>
@@ -269,13 +291,13 @@ export default function TeacherAdmitCards() {
           <div className="space-y-4">
             <div className="flex items-center justify-end gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <button
-                onClick={triggerPrint}
+                onClick={() => triggerPrint('single-admit-pdf')}
                 className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
               >
                 Window Print
               </button>
               <button
-                onClick={() => exportElementToPdf('single-admit-pdf', `Eduzenta_AdmitCard_${singlePreviewCard?.rollNo}.pdf`)}
+                onClick={() => exportElementToPdf('single-admit-pdf', `AdmitCard_${singlePreviewCard?.rollNo || 'student'}.pdf`)}
                 className="px-3.5 py-1.5 rounded-xl qobe-btn-primary text-xs font-bold"
               >
                 Download PDF
@@ -298,13 +320,13 @@ export default function TeacherAdmitCards() {
           <div className="space-y-4">
             <div className="flex items-center justify-end gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <button
-                onClick={triggerPrint}
+                onClick={() => triggerPrint('bulk-admit-pdf-container')}
                 className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold"
               >
                 Window Print
               </button>
               <button
-                onClick={() => exportElementToPdf('bulk-admit-pdf-container', `Eduzenta_Bulk_AdmitCards_${Date.now()}.pdf`)}
+                onClick={() => exportElementToPdf('bulk-admit-pdf-container', 'AdmitCards.pdf')}
                 className="px-3.5 py-1.5 rounded-xl qobe-btn-primary text-xs font-bold"
               >
                 Download Bulk PDF

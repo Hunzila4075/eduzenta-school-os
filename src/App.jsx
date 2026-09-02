@@ -1,62 +1,36 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { useApp } from './context/AppContext';
 import ToastAlert from './components/common/ToastAlert';
 import LockedAccountModal from './components/common/LockedAccountModal';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
-// Pages
-import LandingPage from './pages/landing/LandingPage';
-import UnifiedLoginPage from './pages/auth/UnifiedLoginPage';
-import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
-import AdminManagement from './pages/superadmin/AdminManagement';
-import SuperAdminProfile from './pages/superadmin/SuperAdminProfile';
-import SchoolAdminDashboard from './pages/schooladmin/SchoolAdminDashboard';
-import TeacherManagement from './pages/schooladmin/TeacherManagement';
-import StudentDatabase from './pages/schooladmin/StudentDatabase';
-import AttendanceManagement from './pages/schooladmin/AttendanceManagement';
-import AttendanceOverride from './pages/schooladmin/AttendanceOverride';
-import FeeManagement from './pages/schooladmin/FeeManagement';
-import ExamResultManagement from './pages/schooladmin/ExamResultManagement';
-import AdmitCardGenerator from './pages/schooladmin/AdmitCardGenerator';
-import RemindersEngine from './pages/schooladmin/RemindersEngine';
-import TeacherDashboard from './pages/teacher/TeacherDashboard';
-import TeacherAttendance from './pages/teacher/TeacherAttendance';
-import MarksUpload from './pages/teacher/MarksUpload';
-import StudentEnrollment from './pages/teacher/StudentEnrollment';
-import TeacherAdmitCards from './pages/teacher/TeacherAdmitCards';
-import UserProfileEdit from './pages/profile/UserProfileEdit';
-import UserChangePassword from './pages/profile/UserChangePassword';
+// Route-level code splitting — each page becomes its own chunk, so the initial
+// bundle no longer carries jspdf / xlsx / html2canvas (only PDF/export pages load them).
+const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
+const UnifiedLoginPage = lazy(() => import('./pages/auth/UnifiedLoginPage'));
+const SuperAdminDashboard = lazy(() => import('./pages/superadmin/SuperAdminDashboard'));
+const AdminManagement = lazy(() => import('./pages/superadmin/AdminManagement'));
+const SuperAdminProfile = lazy(() => import('./pages/superadmin/SuperAdminProfile'));
+const SchoolAdminDashboard = lazy(() => import('./pages/schooladmin/SchoolAdminDashboard'));
+const TeacherManagement = lazy(() => import('./pages/schooladmin/TeacherManagement'));
+const StudentDatabase = lazy(() => import('./pages/schooladmin/StudentDatabase'));
+const AttendanceManagement = lazy(() => import('./pages/schooladmin/AttendanceManagement'));
+const AttendanceOverride = lazy(() => import('./pages/schooladmin/AttendanceOverride'));
+const FeeManagement = lazy(() => import('./pages/schooladmin/FeeManagement'));
+const ExamResultManagement = lazy(() => import('./pages/schooladmin/ExamResultManagement'));
+const AdmitCardGenerator = lazy(() => import('./pages/schooladmin/AdmitCardGenerator'));
+const RemindersEngine = lazy(() => import('./pages/schooladmin/RemindersEngine'));
+const TeacherDashboard = lazy(() => import('./pages/teacher/TeacherDashboard'));
+const TeacherAttendance = lazy(() => import('./pages/teacher/TeacherAttendance'));
+const MarksUpload = lazy(() => import('./pages/teacher/MarksUpload'));
+const StudentEnrollment = lazy(() => import('./pages/teacher/StudentEnrollment'));
+const TeacherAdmitCards = lazy(() => import('./pages/teacher/TeacherAdmitCards'));
+const AttendanceHistory = lazy(() => import('./pages/shared/AttendanceHistory'));
+const UserProfileEdit = lazy(() => import('./pages/profile/UserProfileEdit'));
+const UserChangePassword = lazy(() => import('./pages/profile/UserChangePassword'));
 
 export default function App() {
-  const { currentView, currentUser, setCurrentUser, setCurrentView } = useApp();
-
-  // Persistent Hydration on App Mount — preserve exact subpage route if already authenticated
-  useEffect(() => {
-    try {
-      const savedUserStr = localStorage.getItem('user') || localStorage.getItem('eduzenta_user');
-      const savedToken = localStorage.getItem('token') || localStorage.getItem('eduzenta_token');
-      const savedView = localStorage.getItem('eduzenta_current_view');
-
-      if (savedUserStr && savedToken && !currentUser) {
-        const user = JSON.parse(savedUserStr);
-        setCurrentUser(user);
-        if (savedView && savedView !== 'landing' && savedView !== 'login') {
-          setCurrentView(savedView);
-        } else {
-          const role = String(user.role || '').toLowerCase();
-          if (role === 'superadmin' || role === 'super_admin') {
-            setCurrentView('superadmin-dash');
-          } else if (role === 'admin') {
-            setCurrentView('admin-dash');
-          } else if (role === 'teacher') {
-            setCurrentView('teacher-dash');
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[APP HYDRATION WARNING] Failed to parse saved session:', err);
-    }
-  }, []);
+  const { currentView } = useApp();
 
   const renderView = () => {
     switch (currentView) {
@@ -82,6 +56,8 @@ export default function App() {
         return <StudentDatabase />;
       case 'admin-attendance':
         return <AttendanceOverride />;
+      case 'admin-attendance-history':
+        return <AttendanceHistory />;
       case 'admin-fees':
         return <FeeManagement />;
       case 'admin-results':
@@ -100,6 +76,8 @@ export default function App() {
         return <TeacherDashboard />;
       case 'teacher-attendance':
         return <TeacherAttendance />;
+      case 'teacher-attendance-history':
+        return <AttendanceHistory />;
       case 'teacher-marks':
         return <MarksUpload />;
       case 'teacher-students':
@@ -117,11 +95,22 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans antialiased text-slate-900">
+    // Light neutral wrapper — the app shell must stay light so the translucent
+    // navbar / light pages never sit on a dark canvas (old: bg-slate-950, which
+    // caused a black flash and washed-out navbar/button contrast).
+    <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-900">
       <ToastAlert />
       <LockedAccountModal />
       <ErrorBoundary>
-        {renderView()}
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#5A3193]" />
+            </div>
+          }
+        >
+          {renderView()}
+        </Suspense>
       </ErrorBoundary>
     </div>
   );

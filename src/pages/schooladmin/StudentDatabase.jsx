@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import DataTable from '../../components/common/DataTable';
@@ -10,6 +10,7 @@ export default function StudentDatabase() {
   const {
     students: contextStudents,
     currentUser,
+    schoolClasses,
     addStudent,
     updateStudent,
     deactivateStudent,
@@ -32,14 +33,16 @@ export default function StudentDatabase() {
   const [editingStudentId, setEditingStudentId] = useState(null);
 
   const [name, setName] = useState('');
-  const [classSection, setClassSection] = useState('Class 10-A');
+  const [rollNo, setRollNo] = useState('');
+  const [regNo, setRegNo] = useState('');
+  const [classSection, setClassSection] = useState('');
   const [guardianName, setGuardianName] = useState('');
-  const [dob, setDob] = useState('2009-04-12');
+  const [dob, setDob] = useState('');
   const [gender, setGender] = useState('Male');
-  const [phone, setPhone] = useState('+1 (555) 234-5678');
-  const [address, setAddress] = useState('Knowledge City');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
 
-  // Merge API data with context data — API takes priority when available
+  // Merge API data with context data â€” API takes priority when available
   const students = apiStudents !== null ? apiStudents : contextStudents;
 
   // Load students from API on mount
@@ -57,7 +60,7 @@ export default function StudentDatabase() {
         setIsApiConnected(!response.isMock);
       }
     } catch (err) {
-      setApiError('Backend API offline — using local data.');
+      setApiError('Backend API offline â€” using local data.');
       setIsApiConnected(false);
     } finally {
       setIsApiLoading(false);
@@ -66,12 +69,14 @@ export default function StudentDatabase() {
 
   const resetForm = () => {
     setName('');
-    setClassSection('Class 10-A');
+    setRollNo('');
+    setRegNo('');
+    setClassSection('');
     setGuardianName('');
-    setDob('2009-04-12');
+    setDob('');
     setGender('Male');
-    setPhone('+1 (555) 234-5678');
-    setAddress('Knowledge City');
+    setPhone('');
+    setAddress('');
     setEditingStudentId(null);
   };
 
@@ -83,7 +88,8 @@ export default function StudentDatabase() {
     try {
       // Save via API to MySQL database
       const response = await apiAddStudent({
-        rollNo: String(Date.now()).slice(-4),
+        rollNo: rollNo.trim(),
+        regNo: regNo.trim() || null,
         name,
         classSection,
         gender,
@@ -91,8 +97,8 @@ export default function StudentDatabase() {
         guardianName
       });
       if (response?.success && response.data) {
-        // Reload all students from DB after successful insert
-        await loadStudentsFromApi();
+        // Optimistically prepend the DB-returned row â€” skips a full students refetch
+        setApiStudents(prev => (prev === null ? [response.data] : [response.data, ...prev]));
         addToast('Student Enrolled', `${name} has been added to the database.`, 'success');
       } else {
         throw new Error(response?.error || 'Failed to enroll student.');
@@ -112,6 +118,8 @@ export default function StudentDatabase() {
   const handleEditOpen = (std) => {
     setEditingStudentId(std.id);
     setName(std.name);
+    setRollNo(std.rollNo || '');
+    setRegNo(std.regNo || '');
     setClassSection(std.classSection);
     setGuardianName(std.guardianName);
     setDob(std.dob);
@@ -123,11 +131,11 @@ export default function StudentDatabase() {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
-    updateStudent(editingStudentId, { name, classSection, guardianName, dob, gender, phone, address });
+    updateStudent(editingStudentId, { name, rollNo: rollNo.trim(), regNo: regNo.trim() || null, classSection, guardianName, dob, gender, phone, address });
     // Optimistically update API list too
     if (apiStudents !== null) {
       setApiStudents(prev => prev.map(s =>
-        s.id === editingStudentId ? { ...s, name, classSection, guardianName, gender, phone } : s
+        s.id === editingStudentId ? { ...s, name, rollNo: rollNo.trim(), regNo: regNo.trim() || null, classSection, guardianName, gender, phone } : s
       ));
     }
     setIsEditModalOpen(false);
@@ -237,7 +245,7 @@ export default function StudentDatabase() {
               'bg-slate-100 text-slate-500 border-slate-200'
             }`}>
               {isApiLoading
-                ? <><Loader2 className="w-3 h-3 animate-spin" /> Syncing…</>
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> Syncingâ€¦</>
                 : isApiConnected
                   ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> MySQL Live</>
                   : <><WifiOff className="w-3 h-3" /> Local Mode</>
@@ -269,7 +277,7 @@ export default function StudentDatabase() {
           columns={columns}
           data={students}
           filterKey="classSection"
-          filterOptions={["Class 10-A", "Class 9-B"]}
+          filterOptions={Array.isArray(schoolClasses) && schoolClasses.length > 0 ? schoolClasses : undefined}
           searchPlaceholder="Search Name, ID, Roll No, Guardian..."
         />
 
@@ -291,7 +299,7 @@ export default function StudentDatabase() {
                   autoComplete="name"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="e.g. Aiden Vance"
+                  placeholder="Student full name"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
@@ -304,10 +312,36 @@ export default function StudentDatabase() {
                   onChange={e => setClassSection(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium"
                 >
-                  <option value="Class 10-A">Class 10-A</option>
-                  <option value="Class 9-B">Class 9-B</option>
-                  <option value="Class 8-C">Class 8-C</option>
+                  {(schoolClasses || []).map(c => (<option key={c} value={c}>{c}</option>))}
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="add-student-roll" className="block text-xs font-bold text-slate-700 mb-1">Roll Number *</label>
+                <input
+                  id="add-student-roll"
+                  name="rollNo"
+                  type="text"
+                  required
+                  value={rollNo}
+                  onChange={e => setRollNo(e.target.value)}
+                  placeholder="e.g. 12"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                />
+              </div>
+              <div>
+                <label htmlFor="add-student-reg" className="block text-xs font-bold text-slate-700 mb-1">Registration No (optional)</label>
+                <input
+                  id="add-student-reg"
+                  name="regNo"
+                  type="text"
+                  value={regNo}
+                  onChange={e => setRegNo(e.target.value)}
+                  placeholder="e.g. REG-2026-012"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                />
               </div>
             </div>
 
@@ -322,7 +356,7 @@ export default function StudentDatabase() {
                   autoComplete="name"
                   value={guardianName}
                   onChange={e => setGuardianName(e.target.value)}
-                  placeholder="e.g. David Vance"
+                  placeholder="Guardian full name"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
@@ -363,7 +397,7 @@ export default function StudentDatabase() {
                   autoComplete="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
-                  placeholder="+1 (555) 234-5678"
+                  placeholder="Enter phone number"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
                 />
               </div>
@@ -378,7 +412,7 @@ export default function StudentDatabase() {
                 autoComplete="street-address"
                 value={address}
                 onChange={e => setAddress(e.target.value)}
-                placeholder="742 Evergreen Terrace, Knowledge City"
+                placeholder="Enter address"
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
@@ -433,10 +467,34 @@ export default function StudentDatabase() {
                   onChange={e => setClassSection(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium"
                 >
-                  <option value="Class 10-A">Class 10-A</option>
-                  <option value="Class 9-B">Class 9-B</option>
-                  <option value="Class 8-C">Class 8-C</option>
+                  {(schoolClasses || []).map(c => (<option key={c} value={c}>{c}</option>))}
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="edit-student-roll" className="block text-xs font-bold text-slate-700 mb-1">Roll Number</label>
+                <input
+                  id="edit-student-roll"
+                  name="rollNo"
+                  type="text"
+                  required
+                  value={rollNo}
+                  onChange={e => setRollNo(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-student-reg" className="block text-xs font-bold text-slate-700 mb-1">Registration No</label>
+                <input
+                  id="edit-student-reg"
+                  name="regNo"
+                  type="text"
+                  value={regNo}
+                  onChange={e => setRegNo(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                />
               </div>
             </div>
 

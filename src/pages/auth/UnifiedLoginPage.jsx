@@ -64,7 +64,7 @@ export default function UnifiedLoginPage() {
       <div className="absolute top-6 left-6">
         <button
           onClick={() => setCurrentView('landing')}
-          className="text-xs font-bold text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 bg-slate-900/60 px-3.5 py-1.5 rounded-xl backdrop-blur-md border border-slate-700/60 shadow-sm min-h-[44px]"
+          className="text-xs font-bold text-slate-600 hover:text-[#5A3193] transition-colors flex items-center gap-1.5 bg-white/80 px-3.5 py-1.5 rounded-xl backdrop-blur-md border border-slate-200 shadow-sm min-h-[44px]"
         >
           ← Return to Public Website
         </button>
@@ -75,7 +75,7 @@ export default function UnifiedLoginPage() {
         {/* Card Header matching exact spec */}
         <div className="flex flex-col items-center text-center mb-6">
           <EduzentaLogo variant="brand" className="h-10 mb-3" />
-          <h2 className="text-2xl font-black text-[#2d1a4e] tracking-tight">Faculty Login</h2>
+          <h2 className="text-2xl font-black text-[#2d1a4e] tracking-tight">EDUZENTA</h2>
           <p className="text-xs text-slate-500 font-medium mt-1">
             Please fill out the following fields to login:
           </p>
@@ -166,7 +166,7 @@ export default function UnifiedLoginPage() {
           <button
             type="submit"
             disabled={isLoggingIn}
-            className="w-full py-3 px-4 rounded-xl qobe-btn-primary text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60 min-h-[44px]"
+            className="w-full py-3 px-4 rounded-xl qobe-btn-faculty text-xs font-black tracking-wide shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60 min-h-[44px]"
           >
             <span>Login</span>
             <ArrowRight className="w-4 h-4" />
@@ -204,7 +204,7 @@ export default function UnifiedLoginPage() {
           <div className="pt-2 flex justify-center">
             <button
               onClick={() => setContactAdminModalOpen(false)}
-              className="px-6 py-2.5 rounded-xl qobe-btn-primary text-xs font-bold shadow-sm min-h-[44px]"
+              className="px-6 py-2.5 rounded-xl qobe-btn-faculty text-xs font-bold shadow-sm min-h-[44px]"
             >
               OK, Got It
             </button>

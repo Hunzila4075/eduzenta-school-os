@@ -2,30 +2,28 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import Footer from '../../components/Footer';
-import { fetchAttendance as apiFetchAttendance, saveAttendance as apiSaveAttendance } from '../../services/api';
-import { CalendarCheck, Lock, ShieldAlert, Save, Plus, CheckCircle2, UserCheck, Calendar as CalendarIcon, RotateCcw, Loader2, WifiOff } from 'lucide-react';
+import { fetchAttendance as apiFetchAttendance } from '../../services/api';
+import { Lock, ShieldAlert, CheckCircle2, UserCheck, Calendar as CalendarIcon, Loader2, WifiOff } from 'lucide-react';
 
 export default function TeacherAttendance() {
   const {
-    currentUser,
     students,
-    attendance = [],
+    myClasses,
     saveTeacherAttendance,
     getAttendanceForDate,
     addToast
   } = useApp();
 
-  const assignedClasses = currentUser?.assignedClasses || ['Class 10-A', 'Class 9-B'];
-  const [selectedClass, setSelectedClass] = useState(assignedClasses[0] || 'Class 10-A');
+  const assignedClasses = Array.isArray(myClasses) && myClasses.length ? myClasses : [];
+  const [selectedClass, setSelectedClass] = useState(assignedClasses[0] || '');
   
   // Interactive Date Picker state (defaults to today YYYY-MM-DD)
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
-  // Local student attendance map for selected date: { [studentId]: 'P' | 'A' | 'L' }
+  // Local student attendance map for selected date: { [studentId]: 'P' | 'A' } (checkbox: checked = Present)
   const [studentStatuses, setStudentStatuses] = useState({});
   const [isLocked, setIsLocked] = useState(false);
-  const [hasExistingRecord, setHasExistingRecord] = useState(false);
 
   // API sync state
   const [isApiLoading, setIsApiLoading] = useState(false);
@@ -33,9 +31,10 @@ export default function TeacherAttendance() {
   const [isApiConnected, setIsApiConnected] = useState(false);
   const [apiError, setApiError] = useState(null);
 
-  // Filter actual enrolled students for the selected class
-  const classStudents = (students || []).filter(s => s && (s.classSection === selectedClass || (!s.classSection && selectedClass === 'Class 10-A')));
-  const activeStudents = classStudents.length > 0 ? classStudents : (students || []);
+  // Filter actual enrolled students for the selected class — STRICT class scope.
+  // No all-students fallback: if the assigned class has no students, show none.
+  const classStudents = (students || []).filter(s => s && s.classSection === selectedClass);
+  const activeStudents = classStudents;
 
   // Fetch attendance: try API first, fall back to context
   const loadAttendanceForDate = useCallback(async (cls, dt) => {
@@ -46,18 +45,19 @@ export default function TeacherAttendance() {
       if (response?.success && Array.isArray(response.data) && response.data.length > 0) {
         setIsApiConnected(!response.isMock);
         const statusMap = {};
+        let anyLocked = false;
         response.data.forEach(r => {
           // API returns { studentId, status: 'Present'|'Absent' }, map to P/A
-          const code = r.status === 'Present' ? 'P' : r.status === 'Absent' ? 'A' : r.status?.[0] || 'P';
+          const code = r.status === 'Present' ? 'P' : r.status === 'Absent' ? 'A' : r.status?.[0] || 'A';
           statusMap[r.studentId] = code;
+          if (r.isLocked === 1 || r.isLocked === true) anyLocked = true;
         });
         setStudentStatuses(statusMap);
-        setHasExistingRecord(true);
-        setIsLocked(false);
+        setIsLocked(anyLocked);
         setIsApiLoading(false);
         return; // loaded from API, skip context
       }
-    } catch (_) {
+    } catch {
       setIsApiConnected(false);
     }
     setIsApiLoading(false);
@@ -65,15 +65,13 @@ export default function TeacherAttendance() {
     // Fall back to AppContext local state
     const record = getAttendanceForDate ? getAttendanceForDate(cls, dt) : null;
     if (record && record.records && record.records.length > 0) {
-      setHasExistingRecord(true);
       setIsLocked(!!record.isLockedByTeacher);
       const statusMap = {};
       record.records.forEach(r => {
-        statusMap[r.studentId] = r.status || 'P';
+        statusMap[r.studentId] = r.status || 'A';
       });
       setStudentStatuses(statusMap);
     } else {
-      setHasExistingRecord(false);
       setIsLocked(false);
       setStudentStatuses({});
     }
@@ -83,85 +81,47 @@ export default function TeacherAttendance() {
     loadAttendanceForDate(selectedClass, selectedDate);
   }, [selectedClass, selectedDate, loadAttendanceForDate]);
 
-  // Start / Take Attendance for the Selected Date
-  const handleTakeAttendanceForDate = () => {
-    const initialMap = {};
-    activeStudents.forEach(st => {
-      if (st && st.id) {
-        initialMap[st.id] = 'P';
-      }
-    });
-    setStudentStatuses(initialMap);
-    setHasExistingRecord(true);
-
-    const formattedDateStr = new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    addToast('Attendance Started', `Attendance initialized for ${selectedClass} on ${formattedDateStr}. Toggle student statuses and click Save.`, 'success');
-  };
-
-  // Toggle student status (P -> A -> P)
+  // Checkbox toggle: checked = Present, unchecked = Absent
   const handleToggleStatus = (studentId) => {
     if (isLocked) {
-      addToast('Read-Only Record', 'Attendance for this date has been submitted and locked by admin/teacher.', 'warning');
+      addToast('Read-Only Record', 'Attendance for this date is locked. Only administrators can modify it via Attendance Override.', 'warning');
       return;
     }
-    setStudentStatuses(prev => {
-      const current = prev[studentId] || 'P';
-      const next = current === 'P' ? 'A' : 'P';
-      return { ...prev, [studentId]: next };
-    });
+    setStudentStatuses(prev => ({
+      ...prev,
+      [studentId]: prev[studentId] === 'P' ? 'A' : 'P'
+    }));
   };
 
-  // Save / Update Attendance for Selected Date
-  const handleSaveAttendance = async (lockRecord = false) => {
-    if (!hasExistingRecord || Object.keys(studentStatuses).length === 0) {
-      addToast('No Session', 'Please initialize attendance for this date first.', 'warning');
+  // Submit attendance — single atomic save + lock (no separate Save/Update step).
+  const handleSubmitAttendance = async () => {
+    if (isLocked) {
+      addToast('Already Locked', 'Attendance for this date is locked. Only administrators can modify it via Attendance Override.', 'warning');
       return;
     }
-
+    if (activeStudents.length === 0) {
+      addToast('No Students', 'No students found in this class.', 'warning');
+      return;
+    }
     const recordsArray = activeStudents.map(st => ({
       studentId: st.id,
       studentName: st.name,
-      status: studentStatuses[st.id] || 'P'
+      status: studentStatuses[st.id] === 'P' ? 'P' : 'A'
     }));
 
-    // Save to AppContext (local state & localStorage)
+    // Persist via the context — SINGLE save path (API + store synced with server rows).
+    // lock=true → the backend marks the class+date as locked for the teacher in the DB.
     if (saveTeacherAttendance) {
-      saveTeacherAttendance(selectedClass, selectedDate, recordsArray, lockRecord);
-    }
-
-    // Also try to persist to MySQL via API
-    setIsSaving(true);
-    setApiError(null);
-    try {
-      const apiRecords = recordsArray.map(r => ({
-        studentId: r.studentId,
-        status: r.status === 'P' ? 'Present' : 'Absent'
-      }));
-      const response = await apiSaveAttendance({
-        classSection: selectedClass,
-        date: selectedDate,
-        records: apiRecords,
-        markedBy: currentUser?.name || 'Teacher'
-      });
-      if (response?.success) {
-        setIsApiConnected(!response.isMock);
+      setIsSaving(true);
+      try {
+        const res = await saveTeacherAttendance(selectedClass, selectedDate, recordsArray, true);
+        if (res?.success) {
+          setIsLocked(true);
+        }
+      } finally {
+        setIsSaving(false);
       }
-    } catch (_) {
-      setApiError('Saved locally — API sync failed.');
-    } finally {
-      setIsSaving(false);
     }
-
-    if (lockRecord) {
-      setIsLocked(true);
-    }
-
-    const formattedDateStr = new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    addToast(
-      lockRecord ? 'Attendance Locked' : 'Attendance Saved',
-      `Attendance for ${selectedClass} on ${formattedDateStr} has been successfully ${lockRecord ? 'submitted and locked' : 'saved'}.`,
-      'success'
-    );
   };
 
   // Format date for visual display
@@ -222,44 +182,21 @@ export default function TeacherAttendance() {
                 />
               </div>
 
-              {/* Action Buttons */}
-              {!hasExistingRecord ? (
-                <button
-                  onClick={handleTakeAttendanceForDate}
-                  disabled={isApiLoading}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer disabled:opacity-60"
-                >
-                  {isApiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  <span>Take Attendance for {selectedDate}</span>
-                </button>
+              {/* Submit Button — single atomic save + lock */}
+              {isLocked ? (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-200 text-slate-600 border border-slate-300">
+                  <Lock className="w-4 h-4" />
+                  <span>Locked (Read-Only)</span>
+                </div>
               ) : (
-                <>
-                  <button
-                    onClick={() => handleSaveAttendance(false)}
-                    disabled={isLocked || isSaving}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all ${
-                      isLocked || isSaving
-                        ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                    }`}
-                  >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    <span>Save / Update</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleSaveAttendance(true)}
-                    disabled={isLocked || isSaving}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all ${
-                      isLocked || isSaving
-                        ? 'bg-slate-300 text-slate-600 cursor-not-allowed border border-slate-400'
-                        : 'qobe-btn-primary cursor-pointer'
-                    }`}
-                  >
-                    {isLocked ? <Lock className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                    <span>{isLocked ? 'Attendance Locked' : 'Submit & Lock'}</span>
-                  </button>
-                </>
+                <button
+                  onClick={handleSubmitAttendance}
+                  disabled={isSaving || isApiLoading}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all qobe-btn-primary cursor-pointer disabled:opacity-60"
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  <span>{isSaving ? 'Submitting…' : 'Submit Attendance'}</span>
+                </button>
               )}
             </div>
           </div>
@@ -289,7 +226,7 @@ export default function TeacherAttendance() {
               <div className="text-xs">
                 <h4 className="font-extrabold uppercase tracking-wide text-[#2d1a4e]">Attendance Register ({selectedClass} — {displayFormattedDate})</h4>
                 <p className="mt-0.5 text-purple-800 font-medium">
-                  Select any date using the date picker above. Click status cells to toggle between <strong>Present (P)</strong> and <strong>Absent (A)</strong>, then click <strong>"Save / Update"</strong>.
+                  Tick the checkbox to mark a student <strong>Present</strong>; leave it unticked for <strong>Absent</strong>, then click <strong>"Submit Attendance"</strong>. Once submitted, attendance locks automatically — only administrators can modify it afterwards.
                 </p>
               </div>
             </div>
@@ -309,20 +246,13 @@ export default function TeacherAttendance() {
               </span>
             </div>
 
-            {!hasExistingRecord ? (
+            {activeStudents.length === 0 ? (
               <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
                 <UserCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <h4 className="font-extrabold text-slate-800 text-sm">No Active Attendance Sessions for {displayFormattedDate}</h4>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
-                  There are no attendance records saved for {selectedClass} on {displayFormattedDate}. Click below to start recording.
+                <h4 className="font-extrabold text-slate-800 text-sm">No Students in {selectedClass}</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  Students enrolled in this class will appear here for attendance marking.
                 </p>
-                <button
-                  onClick={handleTakeAttendanceForDate}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Take Attendance for {selectedDate}</span>
-                </button>
               </div>
             ) : (
               <div className="w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -332,58 +262,39 @@ export default function TeacherAttendance() {
                       <th className="p-2 border border-slate-800 text-center w-12">Photo</th>
                       <th className="p-2.5 border border-slate-800">Roll / Reg No</th>
                       <th className="p-2.5 border border-slate-800">Student Name</th>
-                      <th className="p-2 border border-slate-800 text-center w-28">
-                        Status ({selectedDate})
-                      </th>
-                      <th className="p-2.5 border border-slate-800 text-center bg-[#5A3193] w-36">
-                        Status Indicator
+                      <th className="p-2.5 border border-slate-800 text-center w-28">
+                        Present
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 text-xs">
                     {activeStudents.map((std, rIdx) => {
-                      const status = studentStatuses[std.id] || 'P';
-                      const isPresent = status === 'P';
+                      const isPresent = studentStatuses[std.id] === 'P';
 
                       return (
                         <tr key={std.id} className={rIdx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
                           <td className="p-1.5 border border-slate-300 text-center">
-                            <img
-                              src={std.photo || "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=250&q=80"}
-                              alt={std.name}
-                              className="w-8 h-8 rounded-full object-cover mx-auto border border-slate-300"
-                            />
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#5A3193] to-pink-500 flex items-center justify-center text-white text-[10px] font-black mx-auto border border-slate-300">
+                              {(std?.name || 'S').split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || 'S'}
+                            </div>
                           </td>
-                          <td className="p-2 border border-slate-300 font-mono font-bold text-[11px]">
+                          <td className="p-2 border border-slate-300 font-mono text-[11px]">
                             {std.rollNo} <span className="text-slate-400 font-normal">({std.regNo || std.id})</span>
                           </td>
-                          <td className="p-2 border border-slate-300 font-extrabold text-slate-900">
+                          <td className="p-2 border border-slate-300 text-slate-800">
                             {std.name}
                           </td>
 
-                          {/* Status Cell */}
-                          <td
-                            onClick={() => handleToggleStatus(std.id)}
-                            className={`p-2 border border-slate-300 text-center cursor-pointer select-none transition-colors ${
-                              isPresent ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
-                            }`}
-                          >
-                            <span className="font-black text-xs px-3 py-1 rounded-md inline-block">
-                              {isPresent ? 'Present (P)' : 'Absent (A)'}
-                            </span>
-                          </td>
-
-                          {/* Indicator Column */}
-                          <td className="p-2.5 border border-slate-300 text-center font-bold text-xs bg-purple-50">
-                            {isPresent ? (
-                              <span className="text-emerald-700 flex items-center justify-center gap-1">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Present
-                              </span>
-                            ) : (
-                              <span className="text-rose-700 flex items-center justify-center gap-1">
-                                <ShieldAlert className="w-3.5 h-3.5" /> Absent
-                              </span>
-                            )}
+                          {/* Present Checkbox — checked = Present, unchecked = Absent */}
+                          <td className="p-2 border border-slate-300 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isPresent}
+                              onChange={() => handleToggleStatus(std.id)}
+                              disabled={isLocked}
+                              className="w-5 h-5 cursor-pointer accent-emerald-600 disabled:cursor-not-allowed"
+                              aria-label={`Mark ${std.name || 'student'} present`}
+                            />
                           </td>
                         </tr>
                       );

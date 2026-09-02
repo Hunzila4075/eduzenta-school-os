@@ -6,49 +6,49 @@ import CreateActivityModal from '../../components/common/CreateActivityModal';
 import ActivityOutcomeModal from '../../components/common/ActivityOutcomeModal';
 
 export default function MarksUpload() {
-  const { currentUser, students, marks, saveSingleStudentAllSubjectMarks, activities, createActivity, updateStudentMarksForActivity } = useApp();
+  const { currentUser, students, marks, myClasses, saveSingleStudentAllSubjectMarks, activities, createActivity, updateStudentMarksForActivity } = useApp();
 
   // Modal state
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [selectedActivityId, setSelectedActivityId] = useState(null);
   const [isOutcomeModalOpen, setOutcomeModalOpen] = useState(false);
 
-  const assignedClasses = currentUser?.assignedClasses || ['Class 10-A', 'Class 9-B'];
-  const assignedSubjects = currentUser?.assignedSubjects || ['Physics', 'Mathematics', 'Chemistry', 'Computer Science'];
+  const assignedClasses = Array.isArray(myClasses) && myClasses.length ? myClasses : [];
+  const assignedSubjects = currentUser?.assignedSubjects || [];
 
-  const [selectedClass, setSelectedClass] = useState(assignedClasses[0] || 'Class 10-A');
+  const [selectedClass, setSelectedClass] = useState(assignedClasses[0] || '');
   const [selectedTerm, setSelectedTerm] = useState('1st Term');
   const classStudents = students.filter(s => s.classSection === selectedClass);
-  const [selectedStudentId, setSelectedStudentId] = useState(classStudents[0]?.id || 'SCH-2025-1001');
+  const [selectedStudentId, setSelectedStudentId] = useState('');
 
   // Selected student mark data or default subject grid
   const currentStudentMarkObj = marks.find(m => m.studentId === selectedStudentId && (m.term === selectedTerm || !m.term));
 
   const [subjectGrid, setSubjectGrid] = useState(() => {
     return assignedSubjects.map(subName => {
-      const existingSub = currentStudentMarkObj?.subjects.find(s => s.name === subName);
+      const existingSub = currentStudentMarkObj?.subjects.find(s => (s.subject || s.name) === subName);
       return {
         name: subName,
-        theoryMarks: existingSub?.obtainedMarks ?? 95,
-        maxMarks: 100,
-        remarks: existingSub?.remarks || 'Excellent performance'
+        theoryMarks: existingSub?.obtainedMarks ?? '',
+        maxMarks: existingSub?.maxMarks || 100,
+        remarks: existingSub?.remarks || ''
       };
     });
   });
 
-  const [teacherRemarks, setTeacherRemarks] = useState(currentStudentMarkObj?.teacherRemarks || 'Student demonstrates exceptional academic performance across all term subjects.');
+  const [teacherRemarks, setTeacherRemarks] = useState(currentStudentMarkObj?.teacherRemarks || '');
 
   const handleStudentSelect = (stdId, termVal = selectedTerm) => {
     setSelectedStudentId(stdId);
     const markObj = marks.find(m => m.studentId === stdId && (m.term === termVal || !m.term));
     if (markObj) {
       setSubjectGrid(assignedSubjects.map(subName => {
-        const existingSub = markObj.subjects.find(s => s.name === subName);
+        const existingSub = markObj.subjects.find(s => (s.subject || s.name) === subName);
         return {
           name: subName,
-          theoryMarks: existingSub?.obtainedMarks ?? 90,
-          maxMarks: 100,
-          remarks: existingSub?.remarks || 'Good progress'
+          theoryMarks: existingSub?.obtainedMarks ?? '',
+          maxMarks: existingSub?.maxMarks || 100,
+          remarks: existingSub?.remarks || ''
         };
       }));
       setTeacherRemarks(markObj.teacherRemarks || '');
@@ -92,8 +92,8 @@ export default function MarksUpload() {
       else if (pct >= 50) grade = 'C';
 
       return {
-        name: sub.name,
-        maxMarks: 100,
+        subject: sub.name,
+        maxMarks: sub.maxMarks || 100,
         obtainedMarks: obt,
         grade,
         remarks: sub.remarks
@@ -106,7 +106,7 @@ export default function MarksUpload() {
   const selectedStudentObj = students.find(s => s.id === selectedStudentId);
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
       <main className="flex-1 w-full min-w-0 overflow-x-hidden p-4 md:p-8">
@@ -116,7 +116,7 @@ export default function MarksUpload() {
             <p className="text-xs text-slate-500 font-medium">Select student and term (1st, 2nd, 3rd Term) to update marks for all subjects simultaneously (100 Max Marks per subject).</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setCreateModalOpen(true)}
               className="px-4 py-2.5 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-700 transition text-xs min-h-[44px] flex items-center gap-1.5 shadow-sm"
@@ -191,14 +191,12 @@ export default function MarksUpload() {
         {/* Student Selector Row */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img
-              src={selectedStudentObj?.photo || "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=250&q=80"}
-              alt={selectedStudentObj?.name}
-              className="w-12 h-12 rounded-full object-cover border-2 border-[#5A3193] shadow-xs"
-            />
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#5A3193] to-pink-500 flex items-center justify-center text-white font-black text-sm border-2 border-[#5A3193] shadow-xs shrink-0">
+              {(selectedStudentObj?.name || 'S').split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || 'S'}
+            </div>
             <div>
               <h3 className="text-base font-black text-slate-900">{selectedStudentObj?.name}</h3>
-              <p className="text-xs text-slate-500 font-mono">Roll: {selectedStudentObj?.rollNo} | ID: {selectedStudentObj?.id} | Reg: {selectedStudentObj?.regNo || 'REG-1001-A'}</p>
+              <p className="text-xs text-slate-500 font-mono">Roll: {selectedStudentObj?.rollNo} | ID: {selectedStudentObj?.id} | Reg: {selectedStudentObj?.regNo || '—'}</p>
             </div>
           </div>
 
@@ -218,7 +216,7 @@ export default function MarksUpload() {
 
         {/* Single Student All-Subject Marks Entry Grid */}
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <h3 className="text-base font-black text-slate-900">
               {selectedTerm} Marks Grid ({selectedStudentObj?.name})
             </h3>

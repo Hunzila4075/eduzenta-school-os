@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import AppSidebar from '../../components/sidebar/AppSidebar';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import ResultCardTemplate from '../../components/pdf/ResultCardTemplate';
 import { exportElementToPdf, triggerPrint } from '../../utils/pdfGenerator';
-import { FileCheck2, Download, Printer, Edit3, Eye, Award, Search, Sparkles } from 'lucide-react';
+import { Download, Printer, Edit3, Award, Search } from 'lucide-react';
 
 export default function ExamResultManagement() {
   const {
@@ -13,29 +13,46 @@ export default function ExamResultManagement() {
     marks,
     currentUser,
     schools,
-    uploadStudentMarks
+    schoolClasses,
+    saveSingleStudentAllSubjectMarks
   } = useApp();
 
-  const currentSchool = schools.find(s => String(s.id) === String(currentUser?.schoolId || currentUser?.school_id)) || schools[0];
+  const currentSchool = schools.find(s => String(s.id) === String(currentUser?.schoolId || currentUser?.school_id));
 
   const schoolInfo = {
-    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || "Eduzenta School",
-    logoUrl: currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || "",
-    address: currentSchool?.address || "Education Boulevard, Knowledge City"
+    name: currentSchool?.name || currentUser?.schoolName || currentUser?.school_name || '',
+    logoUrl: currentSchool?.logoUrl || currentSchool?.logo_url || currentUser?.schoolLogoUrl || currentUser?.school_logo_url || '',
+    address: currentSchool?.address || currentUser?.schoolAddress || currentUser?.school_address || ''
   };
 
-  const [selectedClass, setSelectedClass] = useState('Class 10-A');
+  const [selectedClass, setSelectedClass] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('1st Term');
   const [rollSearch, setRollSearch] = useState('');
+
+  // Default the class selector to the Admin's real school catalog (DB-backed, no sample classes).
+  useEffect(() => {
+    if (!selectedClass && Array.isArray(schoolClasses) && schoolClasses.length > 0) {
+      setSelectedClass(schoolClasses[0]);
+    }
+  }, [schoolClasses, selectedClass]);
 
   const [isPreviewPdfModalOpen, setIsPreviewPdfModalOpen] = useState(false);
   const [singleStudentPreview, setSingleStudentPreview] = useState(null);
   const [isMarksEditModalOpen, setIsMarksEditModalOpen] = useState(false);
 
   const [targetStudentId, setTargetStudentId] = useState('');
-  const [editSubjectName, setEditSubjectName] = useState('Mathematics');
+  const [editSubjectName, setEditSubjectName] = useState('');
   const [editMaxMarks, setEditMaxMarks] = useState(100);
-  const [editObtainedMarks, setEditObtainedMarks] = useState(95);
+  const [editObtainedMarks, setEditObtainedMarks] = useState('');
+
+  // Subject autocomplete options derived from the real saved marks records
+  // (never a hardcoded demo subject list).
+  const subjectOptions = [...new Set(
+    (Array.isArray(marks) ? marks : [])
+      .filter(m => !selectedClass || m.classSection === selectedClass)
+      .flatMap(m => (Array.isArray(m.subjects) ? m.subjects : []).map(s => String(s.subject || '').trim()))
+      .filter(Boolean)
+  )];
 
   // Filter students by class and roll no / reg no / name live search
   const classStudents = students.filter(s => {
@@ -52,7 +69,8 @@ export default function ExamResultManagement() {
   });
 
   const handleBulkPdfExport = () => {
-    exportElementToPdf('bulk-result-pdf-container', `Eduzenta_Term_Results_${selectedTerm.replace(/\s+/g, '_')}_${selectedClass.replace(/\s+/g, '_')}.pdf`);
+    // perElementPages: one student's result card per individual A4 page
+    exportElementToPdf('bulk-result-pdf-container', `Result_Cards_${selectedTerm.replace(/\s+/g, '_')}_${selectedClass.replace(/\s+/g, '_')}.pdf`, { perElementPages: true });
   };
 
   const handleSinglePdfExport = () => {
@@ -62,8 +80,10 @@ export default function ExamResultManagement() {
 
   const handleSaveMarksSubmit = (e) => {
     e.preventDefault();
-    if (!targetStudentId) return;
-    uploadStudentMarks(targetStudentId, editSubjectName, editMaxMarks, editObtainedMarks, "Updated by School Admin");
+    if (!targetStudentId || !editSubjectName.trim()) return;
+    saveSingleStudentAllSubjectMarks(targetStudentId, [
+      { subject: editSubjectName.trim(), maxMarks: Number(editMaxMarks) || 0, obtainedMarks: Number(editObtainedMarks) || 0 }
+    ], selectedTerm, 'Updated by School Admin');
     setIsMarksEditModalOpen(false);
   };
 
@@ -132,24 +152,26 @@ export default function ExamResultManagement() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 w-full min-w-0 overflow-x-hidden p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Printable Result Cards & Academic Reports</h1>
             <p className="text-xs text-slate-500 font-medium">Select Term results, search by Roll/Reg No, and export individual or class-wide PDF result cards.</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 w-full sm:w-auto">
             <select
               value={selectedClass}
               onChange={e => setSelectedClass(e.target.value)}
-              className="py-2.5 px-4 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500"
+              className="w-full sm:w-auto py-2.5 px-4 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500"
             >
-              <option value="Class 10-A">Class 10-A</option>
-              <option value="Class 9-B">Class 9-B</option>
+              <option value="">Select a class...</option>
+              {Array.isArray(schoolClasses) && schoolClasses.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
 
             <button
@@ -165,7 +187,7 @@ export default function ExamResultManagement() {
         {/* Term Selection & Live Search Bar */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* 3 Term Selector Tabs */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wide mr-1">Term:</span>
             {['1st Term', '2nd Term', '3rd Term'].map(t => (
               <button
@@ -226,17 +248,17 @@ export default function ExamResultManagement() {
           <form onSubmit={handleSaveMarksSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Subject Name</label>
-              <select
+              <input
+                type="text"
+                list="subject-name-options"
                 value={editSubjectName}
                 onChange={e => setEditSubjectName(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-medium"
-              >
-                <option value="Mathematics">Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="English Literature">English Literature</option>
-                <option value="Computer Science">Computer Science</option>
-              </select>
+                placeholder="Type or choose a subject"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-medium focus:outline-none focus:border-purple-500"
+              />
+              <datalist id="subject-name-options">
+                {subjectOptions.map(s => <option key={s} value={s} />)}
+              </datalist>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -288,10 +310,10 @@ export default function ExamResultManagement() {
           {singleStudentPreview && (
             <div className="space-y-4">
               <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <span className="text-xs font-bold text-slate-700">Official Eduzenta Student Result Card</span>
+                <span className="text-xs font-bold text-slate-700">Official Student Result Card</span>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={triggerPrint}
+                    onClick={() => triggerPrint('single-result-pdf-container')}
                     className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors flex items-center gap-1"
                   >
                     <Printer className="w-3.5 h-3.5" />
@@ -330,7 +352,7 @@ export default function ExamResultManagement() {
               <span className="text-xs font-bold text-slate-700">Continuous Multi-Page Result Cards ({selectedTerm})</span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={triggerPrint}
+                  onClick={() => triggerPrint('bulk-result-pdf-container')}
                   className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors flex items-center gap-1"
                 >
                   <Printer className="w-3.5 h-3.5" />

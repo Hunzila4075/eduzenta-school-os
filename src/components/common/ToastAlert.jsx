@@ -1,14 +1,14 @@
 import React from 'react';
-import { useApp } from '../../context/AppContext';
+import { useToast } from '../../context/AppContext';
 import { CheckCircle2, AlertTriangle, Info, XCircle, X } from 'lucide-react';
 
 export default function ToastAlert() {
-  const { toasts, removeToast } = useApp();
+  const { toasts, removeToast } = useToast();
 
   if (!toasts.length) return null;
 
   return (
-    <div className="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+    <div className="fixed top-5 right-5 z-50 flex flex-col gap-3 w-[min(24rem,calc(100vw-2.5rem))] pointer-events-none">
       {toasts.map(toast => {
         const isSuccess = toast.type === 'success';
         const isWarning = toast.type === 'warning';

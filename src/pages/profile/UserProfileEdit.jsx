@@ -11,11 +11,11 @@ export default function UserProfileEdit() {
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [phone, setPhone] = useState('+1 (555) 234-5678');
-  const [dob, setDob] = useState('1985-04-12');
-  const [designation, setDesignation] = useState('Faculty Member');
-  const [linkedin, setLinkedin] = useState('https://linkedin.com');
-  const [twitter, setTwitter] = useState('https://twitter.com');
+  const [phone, setPhone] = useState('');
+  const [dob, setDob] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [twitter, setTwitter] = useState('');
   const [avatar, setAvatar] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -73,10 +73,10 @@ export default function UserProfileEdit() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans">
+    <div className="flex flex-col md:flex-row min-h-screen min-h-[100dvh] bg-slate-100 font-sans overflow-x-hidden w-full max-w-full">
       <AppSidebar />
 
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 w-full min-w-0 overflow-x-hidden p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Update My Profile</h1>

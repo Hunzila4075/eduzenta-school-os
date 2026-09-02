@@ -11,6 +11,8 @@ import adminRoutes from './routes/adminRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import broadcastRoutes from './routes/broadcastRoutes.js';
+import teacherRoutes from './routes/teacherRoutes.js';
+import academicRoutes from './routes/academicRoutes.js';
 
 dotenv.config();
 
@@ -86,6 +88,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/broadcasts', broadcastRoutes);
+app.use('/api/teacher', teacherRoutes);
+app.use('/api', academicRoutes);
 
 // Root API Endpoint
 app.get('/', (req, res) => {
@@ -112,11 +116,27 @@ async function startServer() {
     // Force DB auto-migration and Super Admin seeding BEFORE listening
     await initializeDatabase();
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`=================================================`);
       console.log(`⚡ Eduzenta Backend API Server running on port ${PORT}`);
       console.log(`🔗 Health Check Endpoint: http://localhost:${PORT}/api/health`);
       console.log(`=================================================`);
+    });
+
+    // EADDRINUSE safety net — if port 5000 is already bound by an orphaned
+    // node process from a prior session, fail with a clear message instead of
+    // an unhandled crash so the developer can stop the stale process / reuse it.
+    server.on('error', (err) => {
+      if (err && err.code === 'EADDRINUSE') {
+        console.error(`\n❌ Port ${PORT} is already in use by another process.`);
+        console.error('   Another process is listening on that port (likely a leftover node/nodemon session).');
+        console.error('   Stop it, then start this server again:');
+        console.error(`     - Close the old terminal / stop the previous "npm run dev"`);
+        console.error(`     - Or run: npx kill-port ${PORT}`);
+        process.exit(1);
+      }
+      console.error('❌ Server failed to listen:', err);
+      process.exit(1);
     });
   } catch (error) {
     console.error('❌ Server startup error:', error);

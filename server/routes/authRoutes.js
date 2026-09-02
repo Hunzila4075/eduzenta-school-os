@@ -1,11 +1,17 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool, { query } from '../config/db.js';
 import JWT_SECRET from '../config/jwtConfig.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Parse the users.social_links JSON TEXT column into an object (null-safe)
+const parseSocial = (raw) => {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (_) { return null; }
+};
 
 // ------------------------------------------------------------
 // POST /api/auth/login — Authenticate User / Super Admin
@@ -26,6 +32,7 @@ router.post('/login', async (req, res) => {
   try {
     const [rows] = await query(
       `SELECT u.id, u.school_id, u.name, u.email, u.password, u.role, u.avatar_url, u.is_active,
+              u.phone, DATE_FORMAT(u.dob, '%Y-%m-%d') AS dob, u.designation, u.social_links,
               s.name as school_name, s.logo_url as school_logo_url, s.status as school_status
        FROM users u
        LEFT JOIN schools s ON s.id = u.school_id
@@ -86,6 +93,22 @@ router.post('/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
+    // CORE RULE 1 — teachers always receive their live DB assignments on login
+    let assignedClasses = [];
+    let assignedSubjects = [];
+    if (userRoleStr === 'teacher') {
+      try {
+        const [tcaRows] = await pool.query(
+          'SELECT class_section FROM teacher_class_assignments WHERE teacher_user_id = ? ORDER BY class_section ASC',
+          [user.id]
+        );
+        assignedClasses = tcaRows.map(r => r.class_section);
+        const [subjRows] = await pool.query('SELECT assigned_subjects FROM users WHERE id = ?', [user.id]);
+        const rawSubjects = subjRows[0]?.assigned_subjects;
+        assignedSubjects = rawSubjects ? String(rawSubjects).split(',').map(s => s.trim()).filter(Boolean) : [];
+      } catch (_) { /* assignments lookup is best-effort; empty = unassigned */ }
+    }
+
     return res.json({
       success: true,
       message: 'Login successful',
@@ -102,7 +125,13 @@ router.post('/login', async (req, res) => {
         email: user.email,
         role: user.role,
         avatar_url: user.avatar_url,
-        avatar: user.avatar_url
+        avatar: user.avatar_url,
+        phone: user.phone || null,
+        dob: user.dob || null,
+        designation: user.designation || null,
+        socialLinks: parseSocial(user.social_links),
+        assignedClasses,
+        assignedSubjects
       }
     });
   } catch (error) {
@@ -129,7 +158,8 @@ router.get('/me', authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const [rows] = await pool.query(
-      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, u.created_at, u.updated_at,
+      `SELECT u.id, u.school_id, u.name, u.email, u.role, u.avatar_url, u.is_active, u.created_at, u.updated_at, u.assigned_subjects,
+              u.phone, DATE_FORMAT(u.dob, '%Y-%m-%d') AS dob, u.designation, u.social_links,
               s.name as school_name, s.logo_url as school_logo_url, s.status as school_status
        FROM users u
        LEFT JOIN schools s ON s.id = u.school_id
@@ -165,6 +195,21 @@ router.get('/me', authenticateToken, async (req, res) => {
       }
     }
 
+    // CORE RULE 1 — live teacher assignments on every session re-hydration
+    let assignedClasses = [];
+    let assignedSubjects = [];
+    if (userRoleStr === 'teacher') {
+      try {
+        const [tcaRows] = await pool.query(
+          'SELECT class_section FROM teacher_class_assignments WHERE teacher_user_id = ? ORDER BY class_section ASC',
+          [user.id]
+        );
+        assignedClasses = tcaRows.map(r => r.class_section);
+        const rawSubjects = user.assigned_subjects;
+        assignedSubjects = rawSubjects ? String(rawSubjects).split(',').map(s => s.trim()).filter(Boolean) : [];
+      } catch (_) { /* best-effort; empty = unassigned */ }
+    }
+
     return res.json({
       success: true,
       user: {
@@ -172,7 +217,13 @@ router.get('/me', authenticateToken, async (req, res) => {
         schoolId: user.school_id,
         schoolName: user.school_name,
         schoolLogoUrl: user.school_logo_url,
-        avatar: user.avatar_url
+        avatar: user.avatar_url,
+        phone: user.phone || null,
+        dob: user.dob || null,
+        designation: user.designation || null,
+        socialLinks: parseSocial(user.social_links),
+        assignedClasses,
+        assignedSubjects
       }
     });
   } catch (error) {
@@ -189,7 +240,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 // PUT /api/auth/profile — Persistent Profile Update (Name & Profile Picture)
 // ------------------------------------------------------------
 router.put('/profile', authenticateToken, async (req, res) => {
-  const { name, avatar, avatar_url } = req.body;
+  const { name, avatar, avatar_url, phone, dob, designation, socialLinks } = req.body;
   const userId = req.user.id;
 
   if (!name || !name.trim()) {
@@ -202,20 +253,27 @@ router.put('/profile', authenticateToken, async (req, res) => {
 
   const targetAvatar = avatar || avatar_url || null;
 
-  try {
-    if (targetAvatar) {
-      await pool.query(
-        'UPDATE users SET name = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [name.trim(), targetAvatar, userId]
-      );
-    } else {
-      await pool.query(
-        'UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [name.trim(), userId]
-      );
-    }
+  // Single dynamic UPDATE: name always; avatar + optional profile details only
+  // when provided (keeps existing callers 100% backward compatible).
+  const profileFields = ['name = ?'];
+  const profileValues = [name.trim()];
+  if (targetAvatar) { profileFields.push('avatar_url = ?'); profileValues.push(targetAvatar); }
+  if (phone !== undefined) { profileFields.push('phone = ?'); profileValues.push(phone ? String(phone).trim() : null); }
+  if (dob !== undefined) { profileFields.push('dob = ?'); profileValues.push(dob ? String(dob).trim() : null); }
+  if (designation !== undefined) { profileFields.push('designation = ?'); profileValues.push(designation ? String(designation).trim() : null); }
+  if (socialLinks !== undefined) { profileFields.push('social_links = ?'); profileValues.push(socialLinks ? JSON.stringify(socialLinks) : null); }
+  profileFields.push('updated_at = CURRENT_TIMESTAMP');
 
-    const [rows] = await pool.query('SELECT id, school_id, name, email, role, avatar_url, is_active FROM users WHERE id = ?', [userId]);
+  try {
+    await pool.query(
+      `UPDATE users SET ${profileFields.join(', ')} WHERE id = ?`,
+      [...profileValues, userId]
+    );
+
+    const [rows] = await pool.query(
+      'SELECT id, school_id, name, email, role, avatar_url, phone, DATE_FORMAT(dob, \'%Y-%m-%d\') AS dob, designation, social_links, is_active FROM users WHERE id = ?',
+      [userId]
+    );
     const updatedUser = rows[0];
 
     return res.json({
@@ -223,7 +281,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
       message: 'Profile updated successfully.',
       user: {
         ...updatedUser,
-        avatar: updatedUser.avatar_url
+        avatar: updatedUser.avatar_url,
+        socialLinks: parseSocial(updatedUser.social_links)
       }
     });
   } catch (error) {

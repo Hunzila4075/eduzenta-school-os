@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import pool from './config/db.js';
 import { initializeDatabase } from './config/initDb.js';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 
 dotenv.config();
 

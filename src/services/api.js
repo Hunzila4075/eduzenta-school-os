@@ -24,9 +24,11 @@ async function request(endpoint, options = {}) {
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
   };
 
-  // AbortController gives us a hard 10s timeout — prevents infinite pending requests
+    // AbortController gives us a hard 30 s timeout — prevents infinite pending requests.
+  // FIX: increased from 10 s to 30 s so base64 profile-picture uploads of
+  // compressed images (≤ 2 MB) have enough headroom without timing out.
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   const config = {
     ...options,
@@ -80,7 +82,7 @@ async function request(endpoint, options = {}) {
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
-      throw new Error('Request timed out after 10 seconds. Please try again.');
+      throw new Error('Request timed out after 30 seconds. Please try again.');
     }
     console.warn(`[API] ${endpoint} failed:`, error.message);
     throw error;
@@ -112,8 +114,8 @@ export function safeStoreUser(user) {
     schoolLogoUrl: user.school_logo_url || user.schoolLogoUrl || null
   };
   try {
+    // Single canonical key — reads fall back to legacy keys for old sessions.
     localStorage.setItem('user', JSON.stringify(lightweight));
-    localStorage.setItem('eduzenta_user', JSON.stringify(lightweight));
   } catch (e) {
     console.warn('[API SAFE STORE] Storage fallback:', e.message);
   }
@@ -128,7 +130,6 @@ export async function loginUser(email, password) {
 
   if (data?.token) {
     localStorage.setItem('token', data.token);
-    localStorage.setItem('eduzenta_token', data.token);
     if (data.user) {
       safeStoreUser(data.user);
     }
@@ -155,6 +156,14 @@ export async function createSchoolAdmin(payload) {
 // 5. Super Admin: Fetch Schools
 export async function fetchSchools() {
   return request('/superadmin/schools');
+}
+
+// 5b. Super Admin: Update an existing School Admin account
+export async function updateSchoolAdmin(id, payload) {
+  return request(`/superadmin/school-admins/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
 }
 
 // 6. User Management: Create User Account (School Admin / Super Admin)
@@ -186,11 +195,13 @@ export async function deleteUser(id) {
   });
 }
 
-// 10. Profile Update (Name & Profile Picture)
-export async function updateProfile(name, avatar) {
+// 10. Profile Update (Name, Profile Picture & optional profile details)
+// `extra` carries optional fields (phone, dob, designation, socialLinks) that
+// the existing PUT /auth/profile endpoint persists when provided.
+export async function updateProfile(name, avatar, extra = {}) {
   return request('/auth/profile', {
     method: 'PUT',
-    body: JSON.stringify({ name, avatar, avatar_url: avatar })
+    body: JSON.stringify({ name, avatar, avatar_url: avatar, ...extra })
   });
 }
 
@@ -240,6 +251,8 @@ export async function fetchAttendance(classSection = '', date = '') {
   return request(`/attendance${queryString}`);
 }
 
+// 14b. Attendance History is defined below (§25) with the full filter set.
+
 // 15. Save / Record Class Attendance
 export async function saveAttendance(attendancePayload) {
   return request('/attendance', {
@@ -283,4 +296,182 @@ export async function updateSchoolBranding(schoolId, payload) {
     method: 'PUT',
     body: JSON.stringify(payload)
   });
+}
+// ------------------------------------------------------------
+// 21. CLASS CATALOG — single source of truth for all class dropdowns
+// ------------------------------------------------------------
+export async function fetchClasses() {
+  return request('/admin/classes');
+}
+
+export async function createClass(classSection) {
+  return request('/admin/classes', {
+    method: 'POST',
+    body: JSON.stringify(typeof classSection === 'string' ? { classSection } : classSection)
+  });
+}
+
+// Teacher gets ONLY their own assigned classes (server-enforced)
+export async function fetchTeacherClasses() {
+  return request('/teacher/classes');
+}
+
+// Admin assigns the FULL intended class set to a teacher (replaces)
+export async function assignTeacherClasses(teacherId, classes) {
+  return request(`/admin/teachers/${teacherId}/classes`, {
+    method: 'PUT',
+    body: JSON.stringify({ classes })
+  });
+}
+
+// ------------------------------------------------------------
+// 22. MARKS — real persistence for result entry & result cards
+// ------------------------------------------------------------
+export async function fetchMarks(classSection = '', term = '') {
+  const params = new URLSearchParams();
+  if (classSection) params.append('classSection', classSection);
+  if (term) params.append('term', term);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/marks${qs}`);
+}
+
+export async function saveMarks(payload) {
+  return request('/marks', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+// Bulk marks upsert — MANY students for ONE class+term in a SINGLE request.
+// Used by the Activity outcome save so a whole class persists in one
+// round-trip instead of one POST /marks per student.
+export async function saveMarksBulk(payload) {
+  return request('/marks/bulk', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+// ------------------------------------------------------------
+// ACTIVITIES — real persistence (activities table, migration v4)
+// ------------------------------------------------------------
+export async function fetchActivities(classSection = '', term = '') {
+  const params = new URLSearchParams();
+  if (classSection) params.append('classSection', classSection);
+  if (term) params.append('term', term);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/activities${qs}`);
+}
+
+export async function createActivity(payload) {
+  return request('/activities', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateActivity(id, payload) {
+  return request(`/activities/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteActivity(id) {
+  return request(`/activities/${id}`, { method: 'DELETE' });
+}
+
+// ------------------------------------------------------------
+// 23. FEE CHALLANS — real persistence
+// ------------------------------------------------------------
+export async function fetchChallans(classSection = '', term = '') {
+  const params = new URLSearchParams();
+  if (classSection) params.append('classSection', classSection);
+  if (term) params.append('term', term);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/challans${qs}`);
+}
+
+export async function createChallan(payload) {
+  return request('/challans', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateChallanStatus(id, status) {
+  return request(`/challans/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status })
+  });
+}
+
+// FIX: Full challan update endpoint — PATCH /api/challans/:id supports
+// status, term, monthYear, and all fee fields. Used by the Edit Fee Slip modal.
+export async function updateChallan(id, payload) {
+  return request(`/challans/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteChallan(id) {
+  return request(`/challans/${id}`, { method: 'DELETE' });
+}
+
+// ------------------------------------------------------------
+// 24. ADMIT CARDS — real persistence
+// ------------------------------------------------------------
+export async function fetchAdmitCards(classSection = '', term = '') {
+  const params = new URLSearchParams();
+  if (classSection) params.append('classSection', classSection);
+  if (term) params.append('term', term);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return request(`/admit-cards${qs}`);
+}
+
+export async function createAdmitCard(payload) {
+  return request('/admit-cards', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateAdmitCardApi(id, payload) {
+  return request(`/admit-cards/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteAdmitCardApi(id) {
+  return request(`/admit-cards/${id}`, { method: 'DELETE' });
+}
+
+// ------------------------------------------------------------
+// 25. ATTENDANCE HISTORY — paged class-based history w/ filters
+// ------------------------------------------------------------
+export async function fetchAttendanceHistory({ classSection, from = '', to = '', status = '', studentId = '', q = '', page = 1, pageSize = 50 } = {}) {
+  const params = new URLSearchParams();
+  if (classSection) params.append('classSection', classSection);
+  if (from) params.append('from', from);
+  if (to) params.append('to', to);
+  if (status) params.append('status', status);
+  if (studentId) params.append('studentId', studentId);
+  if (q) params.append('q', q);
+  params.append('page', String(page));
+  params.append('pageSize', String(pageSize));
+  return request(`/attendance/history?${params.toString()}`);
+}
+
+// Attendance admin override endpoints
+export async function overrideAttendance(id, status) {
+  return request(`/attendance/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status })
+  });
+}
+
+export async function deleteAttendanceRecord(id) {
+  return request(`/attendance/${id}`, { method: 'DELETE' });
 }
