@@ -1415,7 +1415,8 @@ export function AppProvider({ children }) {
         const updateUserPayload = {
           name: updatedData.name,
           ...(updatedData.email ? { email: updatedData.email } : {}),
-          ...(updatedData.password ? { password: updatedData.password } : {})
+          ...(updatedData.password ? { password: updatedData.password } : {}),
+          ...(updatedData.new_password ? { new_password: updatedData.new_password } : {})
         };
         if (updatedData.assignedSubjects !== undefined) {
           updateUserPayload.assigned_subjects = Array.isArray(updatedData.assignedSubjects)

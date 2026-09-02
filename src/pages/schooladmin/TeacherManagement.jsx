@@ -26,6 +26,10 @@ export default function TeacherManagement() {
   // comma separated. Parsed to an array only at submit time.
   const [assignedClasses, setAssignedClasses] = useState('');
   const [assignedSubjects, setAssignedSubjects] = useState('');
+  // Reset Password state
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const parseClassList = (text) =>
     String(text || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -37,6 +41,9 @@ export default function TeacherManagement() {
     setAssignedClasses('');
     setAssignedSubjects('');
     setEditingTeacherId(null);
+    setShowResetPassword(false);
+    setNewPassword('');
+    setIsResettingPassword(false);
   };
 
   const handleAddSubmit = async (e) => {
@@ -61,6 +68,10 @@ export default function TeacherManagement() {
     // Pre-fill exactly the classes persisted in teacher_class_assignments
     setAssignedClasses(Array.isArray(teacher.assignedClasses) ? teacher.assignedClasses.filter(Boolean).join(', ') : '');
     setAssignedSubjects(teacher.assignedSubjects ? teacher.assignedSubjects.join(', ') : '');
+    // Reset password section
+    setShowResetPassword(false);
+    setNewPassword('');
+    setIsResettingPassword(false);
     setIsEditModalOpen(true);
   };
 
@@ -75,6 +86,25 @@ export default function TeacherManagement() {
     });
     setIsEditModalOpen(false);
     resetForm();
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || String(newPassword).length < 6) {
+      alert('Password must be at least 6 characters.');
+      return;
+    }
+    setIsResettingPassword(true);
+    try {
+      await updateTeacher(editingTeacherId, { new_password: newPassword });
+      alert('Password reset successfully. The teacher can now log in with the new password.');
+      setShowResetPassword(false);
+      setNewPassword('');
+    } catch (err) {
+      alert(err.message || 'Failed to reset password.');
+    } finally {
+      setIsResettingPassword(false);
+    }
   };
 
   const columns = [
@@ -331,6 +361,54 @@ export default function TeacherManagement() {
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
+
+            {/* Reset Password Section */}
+            <div className="border-t border-slate-200 pt-3 mt-3">
+              {!showResetPassword ? (
+                <button
+                  type="button"
+                  onClick={() => setShowResetPassword(true)}
+                  className="text-xs font-semibold text-amber-600 hover:text-amber-700 underline"
+                >
+                  Reset Password
+                </button>
+              ) : (
+                <form onSubmit={handleResetPassword} className="space-y-2">
+                  <label htmlFor="reset-password" className="block text-xs font-bold text-slate-700">
+                    New Password
+                  </label>
+                  <input
+                    id="reset-password"
+                    name="resetPassword"
+                    type="password"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 6 characters)"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setShowResetPassword(false); setNewPassword(''); }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isResettingPassword}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-bold disabled:opacity-50"
+                    >
+                      {isResettingPassword ? 'Resetting...' : 'Confirm Reset'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"

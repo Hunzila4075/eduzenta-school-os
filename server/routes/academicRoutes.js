@@ -640,13 +640,22 @@ router.post('/challans', authenticateToken, requireSchoolStaff, async (req, res)
     const access = await assertTeacherClassAccess(req, classSection);
     if (!access.ok) return respondClassForbidden(res, access);
 
-    const [studentRows] = await pool.query('SELECT id, school_id, class_section, name FROM students WHERE id = ?', [studentId]);
+    const [studentRows] = await pool.query('SELECT id, class_section, name FROM students WHERE id = ?', [studentId]);
     const student = studentRows[0];
     if (!student) {
       return res.status(404).json({ success: false, error: 'Not Found', message: 'Student not found.' });
     }
-    if (!isSuper && String(student.school_id) !== String(schoolId)) {
-      return res.status(403).json({ success: false, error: 'Forbidden', message: 'Student does not belong to your school.' });
+    // School isolation: students table has no school_id column.
+    // Use the teacher_class_assignments relationship (school_id ↔ class_section)
+    // to enforce strict tenant isolation.
+    if (!isSuper && schoolId) {
+      const [schoolCheck] = await pool.query(
+        'SELECT class_section FROM teacher_class_assignments WHERE school_id = ? AND class_section = ? LIMIT 1',
+        [schoolId, student.class_section]
+      );
+      if (schoolCheck.length === 0) {
+        return res.status(403).json({ success: false, error: 'Forbidden', message: 'Student does not belong to your school.' });
+      }
     }
     if (String(student.class_section) !== String(classSection)) {
       return res.status(400).json({ success: false, error: 'Validation Error', message: 'Student does not belong to the selected class.' });
