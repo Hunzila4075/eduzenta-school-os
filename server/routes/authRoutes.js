@@ -31,7 +31,7 @@ router.post('/login', async (req, res) => {
 
   try {
     const [rows] = await query(
-      `SELECT u.id, u.school_id, u.name, u.email, u.password_hash, u.role, u.avatar_url, u.is_active,
+      `SELECT u.id, u.school_id, u.name, u.email, u.password, u.role, u.avatar_url, u.is_active,
               u.phone, DATE_FORMAT(u.dob, '%Y-%m-%d') AS dob, u.designation, u.social_links,
               s.name as school_name, s.logo_url as school_logo_url, s.status as school_status
        FROM users u
@@ -59,7 +59,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Enforce strict bcrypt password validation
-    const isMatch = await bcrypt.compare(password, user.password_hash);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -311,7 +311,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
   }
 
   try {
-    const [rows] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [userId]);
+    const [rows] = await pool.query('SELECT password FROM users WHERE id = ?', [userId]);
     const user = rows[0];
 
     if (!user) {
@@ -323,7 +323,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     }
 
     if (currentPassword) {
-      const isValid = await bcrypt.compare(currentPassword, user.password_hash);
+      const isValid = await bcrypt.compare(currentPassword, user.password);
       if (!isValid) {
         return res.status(401).json({
           success: false,
@@ -334,7 +334,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [hashedPassword, userId]);
+    await pool.query('UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [hashedPassword, userId]);
 
     return res.json({
       success: true,
