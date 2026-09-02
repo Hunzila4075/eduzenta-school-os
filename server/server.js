@@ -91,6 +91,17 @@ app.use('/api/broadcasts', broadcastRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api', academicRoutes);
 
+// Serve sitemap.xml and robots.txt with correct Content-Type BEFORE SPA fallback
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml');
+  res.sendFile('sitemap.xml', { root: './public' });
+});
+
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.sendFile('robots.txt', { root: './public' });
+});
+
 // Root API Endpoint
 app.get('/', (req, res) => {
   res.send('Eduzenta School OS Backend Service API running...');
