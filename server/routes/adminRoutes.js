@@ -616,20 +616,36 @@ router.delete('/users/:id', authenticateToken, requireSchoolAdmin, async (req, r
       try {
         // Child tables first (FK-safe order: attendance references students).
         // Every statement is scoped strictly to this school_id.
+        // Capture class_ids BEFORE any deletions (classes has no school_id column;
+        // school linkage is students.class_section → teacher_class_assignments).
+        const [classIdRows] = await connection.query(
+          'SELECT DISTINCT class_id FROM students WHERE class_section IN (SELECT class_section FROM teacher_class_assignments WHERE school_id = ?)',
+          [schoolId]
+        );
+        const classIdsToDelete = classIdRows.map(r => r.class_id).filter(Boolean);
+        const [tcaRows] = await connection.query(
+          'SELECT class_section FROM teacher_class_assignments WHERE school_id = ?',
+          [schoolId]
+        );
+        const schoolClassSections = tcaRows.map(r => r.class_section);
+
         const cascadeSteps = [
-          ['attendance', 'DELETE FROM attendance WHERE school_id = ?'],
-          ['marks', 'DELETE FROM marks WHERE school_id = ?'],
-          ['fee_challans', 'DELETE FROM fee_challans WHERE school_id = ?'],
-          ['admit_cards', 'DELETE FROM admit_cards WHERE school_id = ?'],
-          ['teacher_class_assignments', 'DELETE FROM teacher_class_assignments WHERE school_id = ?'],
-          ['activities', 'DELETE FROM activities WHERE school_id = ?'],
-          ['students', 'DELETE FROM students WHERE school_id = ?'],
-          ['classes', 'DELETE FROM classes WHERE school_id = ?']
-        ];
+          // attendance, students, classes have NO school_id column — use the
+          // teacher_class_assignments relationship (school_id ↔ class_section).
+          ['attendance', 'DELETE FROM attendance WHERE class_section IN (SELECT class_section FROM teacher_class_assignments WHERE school_id = ?)', [schoolId]],
+          ['marks', 'DELETE FROM marks WHERE school_id = ?', [schoolId]],
+          ['fee_challans', 'DELETE FROM fee_challans WHERE school_id = ?', [schoolId]],
+          ['admit_cards', 'DELETE FROM admit_cards WHERE school_id = ?', [schoolId]],
+          ['teacher_class_assignments', 'DELETE FROM teacher_class_assignments WHERE school_id = ?', [schoolId]],
+          ['activities', 'DELETE FROM activities WHERE school_id = ?', [schoolId]],
+          ['students', 'DELETE FROM students WHERE class_section IN (SELECT class_section FROM teacher_class_assignments WHERE school_id = ?)', [schoolId]],
+          // classes linked via students.class_id (captured before student deletion)
+          classIdsToDelete.length > 0 ? ['classes', `DELETE FROM classes WHERE id IN (${classIdsToDelete.map(() => '?').join(',')})`, classIdsToDelete] : null
+        ].filter(Boolean);
         const deleted = {};
 
-        for (const [table, sql] of cascadeSteps) {
-          const [stepResult] = await connection.query(sql, [schoolId]);
+        for (const [table, sql, params] of cascadeSteps) {
+          const [stepResult] = await connection.query(sql, params || [schoolId]);
           deleted[table] = stepResult.affectedRows;
         }
 
@@ -659,9 +675,13 @@ router.delete('/users/:id', authenticateToken, requireSchoolAdmin, async (req, r
         // ORPHAN VERIFICATION — every school-owned table MUST be empty for
         // this school_id before commit; otherwise roll the whole thing back.
         // ------------------------------------------------------------
+        // Orphan verification: users, marks, fee_challans, admit_cards,
+        // teacher_class_assignments, activities have school_id column.
+        // students, attendance, classes have no school_id — use captured
+        // class_sections and class_ids from the pre-deletion snapshot.
         const orphanTables = [
-          'users', 'students', 'attendance', 'marks', 'fee_challans',
-          'admit_cards', 'teacher_class_assignments', 'activities', 'classes'
+          'users', 'marks', 'fee_challans',
+          'admit_cards', 'teacher_class_assignments', 'activities'
         ];
         const residues = {};
         for (const table of orphanTables) {
@@ -670,6 +690,29 @@ router.delete('/users/:id', authenticateToken, requireSchoolAdmin, async (req, r
             [schoolId]
           );
           if (Number(orphanRows[0]?.c) > 0) residues[table] = Number(orphanRows[0].c);
+        }
+        // Verify students and attendance via captured class_sections
+        if (schoolClassSections.length > 0) {
+          const csPlaceholders = schoolClassSections.map(() => '?').join(',');
+          const [studentResidue] = await connection.query(
+            `SELECT COUNT(*) AS c FROM students WHERE class_section IN (${csPlaceholders})`,
+            schoolClassSections
+          );
+          if (Number(studentResidue[0]?.c) > 0) residues.students = Number(studentResidue[0].c);
+          const [attendanceResidue] = await connection.query(
+            `SELECT COUNT(*) AS c FROM attendance WHERE class_section IN (${csPlaceholders})`,
+            schoolClassSections
+          );
+          if (Number(attendanceResidue[0]?.c) > 0) residues.attendance = Number(attendanceResidue[0].c);
+        }
+        // Verify classes via captured class_ids
+        if (classIdsToDelete.length > 0) {
+          const ciPlaceholders = classIdsToDelete.map(() => '?').join(',');
+          const [classResidue] = await connection.query(
+            `SELECT COUNT(*) AS c FROM classes WHERE id IN (${ciPlaceholders})`,
+            classIdsToDelete
+          );
+          if (Number(classResidue[0]?.c) > 0) residues.classes = Number(classResidue[0].c);
         }
         const [bcLeft] = await connection.query(
           'SELECT COUNT(*) AS c FROM broadcasts WHERE target_school_id = ?',

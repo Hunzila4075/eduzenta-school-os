@@ -274,14 +274,32 @@ router.post('/marks/bulk', authenticateToken, requireSchoolStaff, async (req, re
       return res.status(400).json({ success: false, error: 'Validation Error', message: 'entries[] must contain studentId values.' });
     }
     const [studentRows] = await pool.query(
-      `SELECT id, school_id, class_section FROM students WHERE id IN (${studentIds.map(() => '?').join(', ')})`,
+      `SELECT id, class_section FROM students WHERE id IN (${studentIds.map(() => '?').join(', ')})`,
       studentIds
     );
     const byId = new Map(studentRows.map(s => [String(s.id), s]));
     const invalid = studentIds.filter(id => {
       const s = byId.get(id);
-      return !s || (!isSuper && String(s.school_id) !== String(schoolId)) || String(s.class_section) !== String(classSection);
+      if (!s || String(s.class_section) !== String(classSection)) return true;
+      // School isolation: students table has no school_id column.
+      // Use the teacher_class_assignments relationship (school_id ↔ class_section)
+      // to enforce strict tenant isolation.
+      if (!isSuper) {
+        // Will be verified below via TCA lookup
+        return false;
+      }
+      return false;
     });
+    // Additional school isolation check for non-super users
+    if (!isSuper && invalid.length === 0 && studentIds.length > 0) {
+      const [tcaCheck] = await pool.query(
+        `SELECT DISTINCT class_section FROM teacher_class_assignments WHERE school_id = ? AND class_section = ?`,
+        [schoolId, classSection]
+      );
+      if (tcaCheck.length === 0) {
+        return res.status(403).json({ success: false, error: 'Forbidden', message: `Class ${classSection} does not belong to your school.` });
+      }
+    }
     if (invalid.length > 0) {
       return res.status(403).json({ success: false, error: 'Forbidden', message: `Invalid student(s) for ${classSection}: ${invalid.join(', ')}` });
     }
@@ -899,15 +917,23 @@ router.post('/admit-cards', authenticateToken, requireSchoolStaff, async (req, r
 
         // FIX: Select roll_number, reg_no and guardian_name so the response has real student data
     const [studentRows] = await pool.query(
-      'SELECT id, school_id, class_section, name, roll_number, reg_no, photo_url, guardian_name FROM students WHERE id = ?',
+      'SELECT id, class_section, name, roll_number, reg_no, photo_url, guardian_name FROM students WHERE id = ?',
       [studentId]
     );
     const student = studentRows[0];
     if (!student) {
       return res.status(404).json({ success: false, error: 'Not Found', message: 'Student not found.' });
     }
-    if (!isSuper && String(student.school_id) !== String(schoolId)) {
-      return res.status(403).json({ success: false, error: 'Forbidden', message: 'Student does not belong to your school.' });
+    // School isolation: students table has no school_id column.
+    // Use the teacher_class_assignments relationship (school_id ↔ class_section).
+    if (!isSuper && schoolId) {
+      const [tcaCheck] = await pool.query(
+        'SELECT class_section FROM teacher_class_assignments WHERE school_id = ? AND class_section = ? LIMIT 1',
+        [schoolId, student.class_section]
+      );
+      if (tcaCheck.length === 0) {
+        return res.status(403).json({ success: false, error: 'Forbidden', message: 'Student does not belong to your school.' });
+      }
     }
     if (String(student.class_section) !== String(classSection)) {
       return res.status(400).json({ success: false, error: 'Validation Error', message: 'Student does not belong to the selected class.' });
@@ -944,7 +970,7 @@ router.post('/admit-cards', authenticateToken, requireSchoolStaff, async (req, r
     let examSchedule = [];
     try {
       const classSubjectsMap = await resolveClassSubjects(
-        isSuper ? (student.school_id || null) : (student.school_id || schoolId || null),
+        isSuper ? null : schoolId,
         [classSection]
       );
       examSchedule = (classSubjectsMap[String(classSection)] || [])

@@ -50,8 +50,10 @@ router.get('/', authenticateToken, requireSchoolStaff, async (req, res) => {
     let sql = `SELECT id, student_id, class_section, date, status, marked_by, is_locked, created_at FROM attendance WHERE 1=1`;
     const params = [];
 
+    // School isolation: attendance table has no school_id column.
+    // Use the teacher_class_assignments relationship (school_id ↔ class_section).
     if (!isSuper && schoolId) {
-      sql += ' AND school_id = ?';
+      sql += ' AND class_section IN (SELECT class_section FROM teacher_class_assignments WHERE school_id = ?)';
       params.push(schoolId);
     }
 
@@ -261,8 +263,8 @@ router.post('/', authenticateToken, requireSchoolStaff, async (req, res) => {
     if (studentIds.length > 0) {
       const placeholders = studentIds.map(() => '?').join(', ');
       const [valid] = await db.query(
-        `SELECT id FROM students WHERE id IN (${placeholders}) AND class_section = ?${schoolId ? ' AND school_id = ?' : ''}`,
-        schoolId ? [...studentIds, classSection, schoolId] : [...studentIds, classSection]
+        `SELECT id FROM students WHERE id IN (${placeholders}) AND class_section = ?`,
+        [...studentIds, classSection]
       );
       if (valid.length !== studentIds.length) {
         return res.status(400).json({
@@ -280,10 +282,9 @@ router.post('/', authenticateToken, requireSchoolStaff, async (req, res) => {
     // rows while PRESERVING their locked state, and the single-record
     // PATCH /:id Attendance Override also remains fully functional on locked rows.
     if (isTeacher) {
-      const lockClause = schoolId ? ' AND school_id = ?' : '';
       const [lockedRows] = await db.query(
-        `SELECT id FROM attendance WHERE class_section = ? AND date = ? AND is_locked = 1${lockClause} LIMIT 1`,
-        schoolId ? [classSection, date, schoolId] : [classSection, date]
+        `SELECT id FROM attendance WHERE class_section = ? AND date = ? AND is_locked = 1 LIMIT 1`,
+        [classSection, date]
       );
       if (lockedRows.length > 0) {
         return res.status(403).json({
@@ -301,7 +302,6 @@ router.post('/', authenticateToken, requireSchoolStaff, async (req, res) => {
     // Build a SINGLE bulk INSERT...ON DUPLICATE KEY UPDATE — O(1) DB round-trips regardless of class size
     const rowValues = records.map(rec => [
       rec.studentId,
-      schoolId,
       classSection,
       date,
       rec.status || 'Present',
@@ -309,7 +309,7 @@ router.post('/', authenticateToken, requireSchoolStaff, async (req, res) => {
       lockSubmission ? 1 : 0
     ]);
 
-    const placeholders = rowValues.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
+    const placeholders = rowValues.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
     const flatValues = rowValues.flat();
 
     // Teacher submissions force is_locked = 1 (atomic save+lock). Admin bulk
@@ -326,12 +326,11 @@ router.post('/', authenticateToken, requireSchoolStaff, async (req, res) => {
     const markerExpr = isTeacher ? 'IF(attendance.is_locked = 1, attendance.marked_by, VALUES(marked_by))' : 'VALUES(marked_by)';
 
     const sql = `
-      INSERT INTO attendance (student_id, school_id, class_section, date, status, marked_by, is_locked)
+      INSERT INTO attendance (student_id, class_section, date, status, marked_by, is_locked)
       VALUES ${placeholders}
       ON DUPLICATE KEY UPDATE
         status = ${statusExpr},
         marked_by = ${markerExpr},
-        school_id = VALUES(school_id),
         is_locked = ${lockUpdateExpr},
         updated_at = CURRENT_TIMESTAMP
     `;
@@ -377,9 +376,12 @@ router.patch('/:id', authenticateToken, requireSchoolStaff, async (req, res) => 
 
   try {
     const params = [status, req.user.name || 'Admin Override'];
+    // School isolation: attendance table has no school_id column.
+    // Use the teacher_class_assignments relationship (school_id ↔ class_section)
+    // to enforce strict tenant isolation.
     let schoolClause = '';
     if (role !== 'super_admin' && role !== 'superadmin') {
-      schoolClause = ' AND school_id = ?';
+      schoolClause = ' AND class_section IN (SELECT class_section FROM teacher_class_assignments WHERE school_id = ?)';
     }
     // SQL placeholder order: status, marked_by, id, school_id — params MUST match
     params.push(recordId);
@@ -414,9 +416,12 @@ router.delete('/:id', authenticateToken, requireSchoolStaff, async (req, res) =>
 
   try {
     const params = [recordId];
+    // School isolation: attendance table has no school_id column.
+    // Use the teacher_class_assignments relationship (school_id ↔ class_section)
+    // to enforce strict tenant isolation.
     let schoolClause = '';
     if (role !== 'super_admin' && role !== 'superadmin') {
-      schoolClause = ' AND school_id = ?';
+      schoolClause = ' AND class_section IN (SELECT class_section FROM teacher_class_assignments WHERE school_id = ?)';
       params.push(req.user.school_id);
     }
 
