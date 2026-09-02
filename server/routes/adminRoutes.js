@@ -362,6 +362,11 @@ router.put('/users/:id', authenticateToken, requireSchoolAdmin, async (req, res)
 // ------------------------------------------------------------
 // GET /api/admin/classes — List the school's class catalog
 // (single source of truth for every class dropdown in the app)
+//
+// NOTE: The `classes` table has NO `school_id` column.
+// The intended design (see initDb.js catalog sync) uses
+// `teacher_class_assignments` as the school↔class link.
+// We join through it to enforce tenant isolation.
 // ------------------------------------------------------------
 router.get('/classes', authenticateToken, requireSchoolAdmin, async (req, res) => {
   const role = String(req.user?.role || '').toLowerCase();
@@ -369,19 +374,42 @@ router.get('/classes', authenticateToken, requireSchoolAdmin, async (req, res) =
   const schoolId = req.user.school_id;
 
   try {
-    const [rows] = await pool.query(
-      `SELECT id, school_id, class_name, section, created_at
-       FROM classes
-       WHERE school_id = ? OR ? = 1
-       ORDER BY class_name ASC, section ASC`,
-      [schoolId, isSuper ? 1 : 0]
-    );
+    let sql;
+    const params = [];
+
+    if (isSuper) {
+      // Super Admin: global access — return all classes
+      sql = `SELECT c.id, c.class_name, c.section, c.created_at
+             FROM classes c
+             ORDER BY c.class_name ASC, c.section ASC`;
+    } else {
+      // Admin/Teacher: only classes linked to their school via teacher_class_assignments.
+      // Use TCA as the base (LEFT JOIN to classes) so we return all assigned class_sections
+      // even if they don't exist in the classes table yet.
+      // initDb.js catalog sync (line 493) proves TCA is the intended school↔class link.
+      sql = `SELECT DISTINCT
+                tca.class_section,
+                c.id,
+                COALESCE(c.class_name, TRIM(SUBSTRING_INDEX(tca.class_section, '-', 1))) AS class_name,
+                COALESCE(c.section, CASE WHEN LOCATE('-', tca.class_section) > 0
+                                    THEN TRIM(SUBSTRING_INDEX(tca.class_section, '-', -1))
+                                    ELSE NULL END) AS section
+             FROM teacher_class_assignments tca
+             LEFT JOIN classes c
+               ON tca.class_section = CONCAT(c.class_name, '-', c.section)
+                  OR tca.class_section = c.class_name
+             WHERE tca.school_id = ?
+             ORDER BY class_name ASC, section ASC`;
+      params.push(schoolId);
+    }
+
+    const [rows] = await pool.query(sql, params);
     const data = rows.map(r => ({
-      id: r.id,
-      schoolId: r.school_id,
+      id: r.id || null, // null if class doesn't exist in classes table yet
+      schoolId: schoolId || null,
       className: r.class_name,
       section: r.section,
-      classSection: `${r.class_name}${r.section ? `-${r.section}` : ''}`
+      classSection: r.class_section || `${r.class_name}${r.section ? `-${r.section}` : ''}`
     }));
     return res.json({ success: true, count: data.length, data });
   } catch (error) {
@@ -419,12 +447,24 @@ router.post('/classes', authenticateToken, requireSchoolAdmin, async (req, res) 
   }
   parsedSection = parsedSection.toUpperCase();
 
+  const connection = await pool.getConnection();
   try {
-    const [result] = await pool.query(
-      `INSERT INTO classes (school_id, class_name, section) VALUES (?, ?, ?)
+    await connection.beginTransaction();
+    // classes table has no school_id column — school linkage is via teacher_class_assignments
+    const [result] = await connection.query(
+      `INSERT INTO classes (class_name, section) VALUES (?, ?)
        ON DUPLICATE KEY UPDATE class_name = VALUES(class_name), section = VALUES(section)`,
-      [schoolId, parsedClassName, parsedSection]
+      [parsedClassName, parsedSection]
     );
+    // Also create a TCA entry so the class appears in the admin's class dropdown.
+    // TCA is the authoritative school↔class link (see initDb.js catalog sync, line 493).
+    // Use INSERT IGNORE to avoid duplicates if a TCA already exists for this class_section+school.
+    await connection.query(
+      `INSERT IGNORE INTO teacher_class_assignments (school_id, teacher_user_id, class_section)
+       VALUES (?, NULL, ?)`,
+      [schoolId, `${parsedClassName}${parsedSection ? `-${parsedSection}` : ''}`]
+    );
+    await connection.commit();
     const classSectionStr = `${parsedClassName}${parsedSection ? `-${parsedSection}` : ''}`;
     return res.status(201).json({
       success: true,
@@ -432,8 +472,11 @@ router.post('/classes', authenticateToken, requireSchoolAdmin, async (req, res) 
       data: { id: result.insertId, schoolId, className: parsedClassName, section: parsedSection, classSection: classSectionStr }
     });
   } catch (error) {
+    await connection.rollback();
     console.error('[CREATE CLASS ERROR]:', error);
     return res.status(500).json({ success: false, error: 'Internal Server Error', message: error.message });
+  } finally {
+    connection.release();
   }
 });
 
