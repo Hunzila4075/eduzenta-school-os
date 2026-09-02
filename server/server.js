@@ -91,15 +91,29 @@ app.use('/api/broadcasts', broadcastRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api', academicRoutes);
 
-// Serve sitemap.xml and robots.txt with correct Content-Type BEFORE SPA fallback
+// Keep these responses self-contained: Railway deploys the server directory,
+// while the Vite/static host separately serves the copies under public/.
+const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://eduzenta.site.je/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`;
+
+const robotsTxt = `User-agent: *
+Allow: /
+
+Sitemap: https://eduzenta.site.je/sitemap.xml`;
+
+// Serve SEO files with the correct content types before the 404 fallback.
 app.get('/sitemap.xml', (req, res) => {
-  res.type('application/xml');
-  res.sendFile('sitemap.xml', { root: './public' });
+  res.type('application/xml').send(sitemapXml);
 });
 
 app.get('/robots.txt', (req, res) => {
-  res.type('text/plain');
-  res.sendFile('robots.txt', { root: './public' });
+  res.type('text/plain').send(robotsTxt);
 });
 
 // Root API Endpoint
