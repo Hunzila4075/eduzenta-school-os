@@ -128,8 +128,11 @@ router.get('/history', authenticateToken, requireSchoolStaff, async (req, res) =
     let where = 'WHERE 1=1';
     const params = [];
 
-    if (!isSuper) {
-      where += ' AND a.school_id = ?';
+    // School isolation: attendance table has no school_id column.
+    // Use the teacher_class_assignments relationship (school_id ↔ class_section)
+    // to enforce strict tenant isolation.
+    if (!isSuper && schoolId) {
+      where += ' AND a.class_section IN (SELECT class_section FROM teacher_class_assignments WHERE school_id = ?)';
       params.push(schoolId);
     }
     if (classSection) {

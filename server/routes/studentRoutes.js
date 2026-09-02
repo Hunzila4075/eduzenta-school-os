@@ -36,14 +36,17 @@ router.get('/', authenticateToken, requireSchoolStaff, async (req, res) => {
     }
 
     let sql = `
-      SELECT id, school_id, roll_number, reg_no, name, class_section,
+      SELECT id, roll_number, reg_no, name, class_section,
              gender, phone, guardian_name, photo_url, status, created_at
       FROM students WHERE 1=1
     `;
     const params = [];
 
-    if (!isSuper) {
-      sql += ' AND school_id = ?';
+    // School isolation: students table has no school_id column.
+    // Use the teacher_class_assignments relationship (school_id ↔ class_section)
+    // to enforce strict tenant isolation.
+    if (!isSuper && schoolId) {
+      sql += ' AND class_section IN (SELECT class_section FROM teacher_class_assignments WHERE school_id = ?)';
       params.push(schoolId);
     }
 
@@ -65,7 +68,6 @@ router.get('/', authenticateToken, requireSchoolStaff, async (req, res) => {
     const [rows] = await pool.query(sql, params);
     const formatted = rows.map(r => ({
       id: r.id,
-      schoolId: r.school_id,
       rollNo: r.roll_number,
       regNo: r.reg_no,
       name: r.name,
@@ -117,14 +119,14 @@ router.post('/', authenticateToken, requireSchoolStaff, async (req, res) => {
     }
 
     await pool.query(
-      `INSERT INTO students (id, school_id, roll_number, reg_no, name, class_section, gender, phone, guardian_name, photo_url, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')`,
-      [studentId, schoolId, rollNo, regNo || null, name, classSection, gender || 'Male', phone || null, guardianName || null, targetPhoto]
+      `INSERT INTO students (id, roll_number, reg_no, name, class_section, gender, phone, guardian_name, photo_url, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')`,
+      [studentId, rollNo, regNo || null, name, classSection, gender || 'Male', phone || null, guardianName || null, targetPhoto]
     );
     return res.status(201).json({
       success: true,
       message: 'Student enrolled successfully.',
-      data: { id: studentId, schoolId, rollNo, regNo, name, classSection, gender: gender || 'Male', phone, guardianName, photo: targetPhoto, photoUrl: targetPhoto, status: 'Active' }
+      data: { id: studentId, schoolId: schoolId || null, rollNo, regNo, name, classSection, gender: gender || 'Male', phone, guardianName, photo: targetPhoto, photoUrl: targetPhoto, status: 'Active' }
     });
   } catch (error) {
     console.error('[STUDENTS API POST ERROR]:', error);
@@ -140,7 +142,7 @@ router.put('/:id', authenticateToken, requireSchoolStaff, async (req, res) => {
 
   try {
     const [existing] = await pool.query(
-      'SELECT id, school_id, roll_number, reg_no, name, class_section, gender, phone, guardian_name, photo_url, status FROM students WHERE id = ?',
+      'SELECT id, roll_number, reg_no, name, class_section, gender, phone, guardian_name, photo_url, status FROM students WHERE id = ?',
       [studentId]
     );
     if (!existing || existing.length === 0) return res.status(404).json({ success: false, error: 'Student not found.' });
@@ -148,8 +150,17 @@ router.put('/:id', authenticateToken, requireSchoolStaff, async (req, res) => {
     const { isSuper, isTeacher } = resolveRole(req);
     const current = existing[0];
 
-    if (!isSuper && current.school_id && String(current.school_id) !== String(req.user.school_id)) {
-      return res.status(403).json({ success: false, error: 'Not authorized to update this student.' });
+    // School isolation: students table has no school_id column.
+    // Use the teacher_class_assignments relationship (school_id ↔ class_section)
+    // to enforce strict tenant isolation.
+    if (!isSuper && req.user.school_id) {
+      const [schoolCheck] = await pool.query(
+        'SELECT class_section FROM teacher_class_assignments WHERE school_id = ? AND class_section = ? LIMIT 1',
+        [req.user.school_id, current.class_section]
+      );
+      if (schoolCheck.length === 0) {
+        return res.status(403).json({ success: false, error: 'Not authorized to update this student.' });
+      }
     }
 
     // CORE RULE 1 — teacher can only touch students of their assigned classes
@@ -161,7 +172,8 @@ router.put('/:id', authenticateToken, requireSchoolStaff, async (req, res) => {
 
     // Moving a student into a class must target the school's class catalog
     if (classSection && classSection !== current.class_section) {
-      if (current.school_id && !(await classExistsInCatalog(current.school_id, classSection))) {
+      const targetSchoolId = isSuper ? (req.body.school_id || req.user.school_id) : req.user.school_id;
+      if (targetSchoolId && !(await classExistsInCatalog(targetSchoolId, classSection))) {
         return res.status(400).json({
           success: false,
           error: 'Validation Error',
@@ -193,7 +205,6 @@ router.put('/:id', authenticateToken, requireSchoolStaff, async (req, res) => {
     // without spending another WAN round-trip.
     const r = {
       id: current.id,
-      school_id: current.school_id,
       roll_number: rollNo !== undefined ? rollNo : current.roll_number,
       reg_no: regNo !== undefined ? regNo : current.reg_no,
       name: name !== undefined ? name : current.name,
@@ -206,7 +217,7 @@ router.put('/:id', authenticateToken, requireSchoolStaff, async (req, res) => {
     };
     return res.json({
       success: true, message: 'Student updated successfully.',
-      data: { id: r.id, schoolId: r.school_id, rollNo: r.roll_number, regNo: r.reg_no, name: r.name, classSection: r.class_section, gender: r.gender, phone: r.phone, guardianName: r.guardian_name, photo: r.photo_url, photoUrl: r.photo_url, status: r.status }
+      data: { id: r.id, schoolId: req.user.school_id || null, rollNo: r.roll_number, regNo: r.reg_no, name: r.name, classSection: r.class_section, gender: r.gender, phone: r.phone, guardianName: r.guardian_name, photo: r.photo_url, photoUrl: r.photo_url, status: r.status }
     });
   } catch (error) {
     console.error('[STUDENTS API PUT ERROR]:', error);
@@ -221,18 +232,26 @@ router.delete('/:id', authenticateToken, requireSchoolStaff, async (req, res) =>
   const { isSuper, isTeacher } = resolveRole(req);
 
   try {
-    const [rows] = await pool.query('SELECT class_section, school_id FROM students WHERE id = ?', [studentId]);
+    const [rows] = await pool.query('SELECT class_section FROM students WHERE id = ?', [studentId]);
     if (!rows || rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Not Found', message: 'Student not found in database.' });
     }
+    const studentClassSection = rows[0].class_section;
     // IDOR HARDENING — non-super callers (admins/teachers) may only delete
-    // students of their own school.
-    if (!isSuper && rows[0].school_id && String(rows[0].school_id) !== String(req.user.school_id)) {
-      return res.status(403).json({ success: false, error: 'Forbidden', message: 'Not authorized to delete this student.' });
+    // students of their own school. Use the teacher_class_assignments
+    // relationship (school_id ↔ class_section) for tenant isolation.
+    if (!isSuper && req.user.school_id) {
+      const [schoolCheck] = await pool.query(
+        'SELECT class_section FROM teacher_class_assignments WHERE school_id = ? AND class_section = ? LIMIT 1',
+        [req.user.school_id, studentClassSection]
+      );
+      if (schoolCheck.length === 0) {
+        return res.status(403).json({ success: false, error: 'Forbidden', message: 'Not authorized to delete this student.' });
+      }
     }
     // CORE RULE 1 — teacher may only delete students of their assigned classes
     if (isTeacher) {
-      const access = await assertTeacherClassAccess(req, rows[0].class_section);
+      const access = await assertTeacherClassAccess(req, studentClassSection);
       if (!access.ok) return respondClassForbidden(res, access);
     }
 

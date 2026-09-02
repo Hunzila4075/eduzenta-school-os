@@ -31,7 +31,7 @@ router.post('/login', async (req, res) => {
 
   try {
     const [rows] = await query(
-      `SELECT u.id, u.school_id, u.name, u.email, u.password, u.role, u.avatar_url, u.is_active,
+      `SELECT u.id, u.school_id, u.name, u.email, u.password, u.role, u.is_active,
               u.phone, DATE_FORMAT(u.dob, '%Y-%m-%d') AS dob, u.designation, u.social_links,
               s.name as school_name, s.logo_url as school_logo_url, s.status as school_status
        FROM users u
@@ -124,8 +124,8 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        avatar_url: user.avatar_url,
-        avatar: user.avatar_url,
+        // Avatar intentionally excluded from login response to reduce payload
+        // (~2-2.5 MB per user). The frontend lazy-loads it via GET /auth/me.
         phone: user.phone || null,
         dob: user.dob || null,
         designation: user.designation || null,

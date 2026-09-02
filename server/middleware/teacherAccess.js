@@ -83,17 +83,17 @@ export function respondClassForbidden(res, access) {
   });
 }
 
-// Verify a class exists in a school's class catalog (single class source).
-// Accepts the full class_section string, e.g. "Class 10-A" or "Class 10".
+// Verify a class exists in a school's class catalog.
+// The classes table has no school_id column, so we use the
+// teacher_class_assignments relationship (school_id ↔ class_section)
+// as the single source of truth for what classes belong to a school.
+// Accepts the full class_section string, e.g. "Class 10-A" or "Class 6".
 export async function classExistsInCatalog(schoolId, classSection) {
   if (!classSection || !schoolId) return false;
-  const dashIdx = String(classSection).indexOf('-');
-  const className = dashIdx > -1 ? String(classSection).slice(0, dashIdx).trim() : String(classSection).trim();
-  const section = dashIdx > -1 ? String(classSection).slice(dashIdx + 1).trim() : '';
   try {
     const [rows] = await pool.query(
-      'SELECT id FROM classes WHERE school_id = ? AND class_name = ? AND section = ? LIMIT 1',
-      [schoolId, className, section]
+      'SELECT class_section FROM teacher_class_assignments WHERE school_id = ? AND class_section = ? LIMIT 1',
+      [schoolId, classSection]
     );
     return rows.length > 0;
   } catch (_) {
