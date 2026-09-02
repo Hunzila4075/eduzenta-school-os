@@ -36,6 +36,13 @@ export default function StudentDatabase() {
   const [rollNo, setRollNo] = useState('');
   const [regNo, setRegNo] = useState('');
   const [classSection, setClassSection] = useState('');
+
+  // Auto-select first class when schoolClasses loads asynchronously
+  useEffect(() => {
+    if (schoolClasses && schoolClasses.length > 0 && !classSection) {
+      setClassSection(schoolClasses[0]);
+    }
+  }, [schoolClasses, classSection]);
   const [guardianName, setGuardianName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('Male');
@@ -312,6 +319,7 @@ export default function StudentDatabase() {
                   onChange={e => setClassSection(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium"
                 >
+                  <option value="" disabled hidden>{(schoolClasses || []).length === 0 ? 'Loading classes...' : '-- Select Class --'}</option>
                   {(schoolClasses || []).map(c => (<option key={c} value={c}>{c}</option>))}
                 </select>
               </div>
@@ -425,9 +433,9 @@ export default function StudentDatabase() {
               >
                 Cancel
               </button>
-              <button
+                          <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || !classSection}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-sm disabled:opacity-60"
               >
                 {isSaving && <Loader2 className="w-3 h-3 animate-spin" />}
